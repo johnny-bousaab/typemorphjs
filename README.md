@@ -1,2 +1,15 @@
-# typemorphjs
-Typing animation library that morphs HTML and Markdown elements smoothly — like GPT outputs. Apply typing effect to Markdown or HTML input seamlessly. 
+# TypeMorphJS
+
+Smooth typing animation that morphs HTML and Markdown like GPT.
+
+## 🚧 Work in Progress
+
+Currently in private development. Public release planned once the core features are stable.
+
+## Planned Features
+- Typing animation for HTML & Markdown output
+- Streamed or batch rendering
+- Configurable speed and delays
+- Lightweight, dependency-free
+
+Stay tuned!
