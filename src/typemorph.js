@@ -4,62 +4,91 @@ import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
 export class TypeMorph {
   constructor(config = {}) {
     this.config = { ...defaultConfigs, ...config };
-    this.parent =
-      typeof this.config.parent === "string"
-        ? this._elementById(this.config.parent)
-        : this.config.parent;
-
-    if (!this.parent) {
-      throw new Error("Parent element not found");
-    }
-
     this.text = this.config.text;
     this.speed = this.config.speed;
     this.cursorChar = this.config.cursorChar;
     this.loop = this.config.loop;
     this.loopCount = this.config.loopCount;
-    this.currentLoop = 0;
-    this.cursorEl = null;
-    this.typingInterval = null;
-
+    this._currentLoop = 0;
+    this._cursorEl = null;
     this._stopped = false;
-    this._currentResolve = null;
+    this._loopInterrupted = false;
+    this._typingResolve = null;
+    this._backspaceResolve = null;
+    this._typingInterval = null;
+    this._backspaceInterval = null;
+    this._delayResolve = null;
+    this._delayTimer = null;
+    this._startQueue = Promise.resolve();
+    this._typeQueue = Promise.resolve();
   }
 
-  async start() {
+  async start(text = null) {
+    await this.stop(true);
+    this._startQueue = this._startQueue.then(() => this._start(text));
+    return this._startQueue;
+  }
+
+  async type(text, parent = null) {
+    await this.stop(true);
     this._createCursor();
+    this._stopped = false;
+    this._typeQueue = this._typeQueue.then(() => this._type(text, parent));
+    return this._typeQueue;
+  }
+
+  async stop(internalStop = false) {
+    this._stopped = true;
+    this._loopInterrupted = true;
+    this._clearCursor();
+    this._clearTypingRefs();
+
+    await this._yieldToEventLoop();
+
+    if (!internalStop && typeof this.config.onStop === "function") {
+      this.config.onStop(this);
+    }
+  }
+
+  destroy() {
+    this.stop(true);
+    if (this._cursorEl) this._cursorEl.remove();
+    this.config.onDestroy?.(this);
+  }
+
+  async _start(text = null) {
+    this._createCursor();
+    this.loop = this.config.loop;
+    this._currentLoop = 0;
+    this._stopped = false;
+    this._loopInterrupted = false;
+
+    if (this.config.parent) this._setParent(this.config.parent);
+
+    this._setText(text ?? this.text);
+
+    if (!this.text) return;
+
+    if (this.config.clearBeforeTyping) {
+      this._clearContent();
+    }
 
     do {
-      let content = this.text;
-
-      if (this.config.parseMarkdown) {
-        const parser = this.config.markdownParser || marked;
-        content = parser.parse(content);
-      }
-
-      if (this.currentLoop > 0 && this.config.loopStartDelay) {
-        await new Promise((r) => setTimeout(r, this.config.loopStartDelay));
-      }
-
-      // console.log("awaiting...");
-
-      if (this.config.parseHTML) {
-        await this._typeHTML(content);
-      } else {
-        await this._typeText(content);
-      }
-
-      // console.log("typed");
-
-      if (this.loop && this.config.loopEndDelay && !this._stopped) {
-        await new Promise((r) => setTimeout(r, this.config.loopEndDelay));
-      }
-
       if (
-        this.loop &&
-        this.currentLoop + 1 < this.loopCount &&
-        !this._stopped
+        this._currentlyLooping() &&
+        this._currentLoop > 0 &&
+        this.config.loopStartDelay
       ) {
+        await this._delay(this.config.loopStartDelay);
+      }
+
+      await this._type(this.text, null, { startSource: true });
+
+      if (this._currentlyLooping() && this.config.loopEndDelay) {
+        await this._delay(this.config.loopEndDelay);
+      }
+
+      if (this._currentlyLooping() && this._currentLoop + 1 < this.loopCount) {
         if (this.config.loopType === "clear") {
           this._clearContent();
         } else {
@@ -67,42 +96,46 @@ export class TypeMorph {
         }
       }
 
-      this.currentLoop++;
-    } while (this.loop && this.currentLoop < this.loopCount && !this._stopped);
+      this._currentLoop++;
+    } while (this._currentlyLooping() && this._currentLoop < this.loopCount);
 
-    if (!this._stopped) this._onFinish();
+    if (!this._stopped && !this._loopInterrupted) this._onFinish();
+
+    console.debug("Resolving => _start");
   }
 
-  stop() {
-    this._stopped = true;
-    this._clearCursor();
+  async _type(newText, parent = null, options = {}) {
+    this._setParent(parent ?? this.config.parent);
+    this._setText(newText);
 
-    if (this.typingInterval) {
-      clearInterval(this.typingInterval);
-      this.typingInterval = null;
+    if (this.config.clearBeforeTyping && !this._currentlyLooping()) {
+      this._clearContent();
     }
 
-    if (this._currentResolve) {
-      this._currentResolve();
-      this._currentResolve = null;
+    let contentToType = this.text;
+    if (this.config.parseMarkdown) {
+      const parser = this.config.markdownParser || marked;
+      contentToType = this.config.markdownInline
+        ? parser.parseInline(contentToType)
+        : parser.parse(contentToType);
     }
 
-    if (typeof this.config.onStop === "function") {
-      this.config.onStop(this);
+    if (this.config.parseHTML) {
+      await this._typeHTML(contentToType);
+    } else {
+      await this._typeText(contentToType);
     }
-  }
 
-  destroy() {
-    if (this.typingInterval) clearInterval(this.typingInterval);
-    if (this.cursorEl) this.cursorEl.remove();
-    this.config.onDestroy?.(this);
+    if (!options.startSource && !this._stopped) {
+      this._onFinish();
+    }
   }
 
   _createCursor() {
-    if (!this.config.showCursor) return;
-    this.cursorEl = document.createElement("span");
-    this.cursorEl.textContent = this.cursorChar;
-    this.cursorEl.className = "typemorph-cursor";
+    if (!this.config.showCursor || this._cursorEl) return;
+    this._cursorEl = document.createElement("span");
+    this._cursorEl.textContent = this.cursorChar;
+    this._cursorEl.className = "typemorph-cursor";
   }
 
   async _typeHTML(html) {
@@ -126,11 +159,11 @@ export class TypeMorph {
         }
 
         if (
-          this.cursorEl &&
-          this.cursorEl.parentNode === parent &&
-          this.cursorEl.nextSibling === null
+          this._cursorEl &&
+          this._cursorEl.parentNode === parent &&
+          this._cursorEl.nextSibling === null
         ) {
-          parent.removeChild(this.cursorEl);
+          parent.removeChild(this._cursorEl);
         }
 
         parent.appendChild(el);
@@ -141,53 +174,47 @@ export class TypeMorph {
 
   _typeText(text, parent = this.parent) {
     return new Promise((resolve) => {
-      this._currentResolve = resolve;
-      this._stopped = false;
+      this._typingResolve = resolve;
 
       let i = 0;
-      if (this.cursorEl) {
-        if (this.cursorEl.parentNode) {
-          this.cursorEl.parentNode.removeChild(this.cursorEl);
+      if (this._cursorEl) {
+        if (this._cursorEl.parentNode) {
+          this._cursorEl.parentNode.removeChild(this._cursorEl);
         }
-        parent.appendChild(this.cursorEl);
+        parent.appendChild(this._cursorEl);
       }
-      this.typingInterval = setInterval(() => {
+      const currTypingInterval = (this._typingInterval = setInterval(() => {
         if (this._stopped || i >= text.length) {
-          clearInterval(this.typingInterval);
-          this.typingInterval = null;
-          this._currentResolve = null;
+          this._clearTypingRefs();
+          if (currTypingInterval) clearInterval(currTypingInterval);
+          console.debug("Resolving => _typeText");
           return resolve();
         }
 
-        if (this.cursorEl) {
-          let existingTextNode = null;
-          if (
-            this.cursorEl.previousSibling &&
-            this.cursorEl.previousSibling.nodeType === Node.TEXT_NODE
-          ) {
-            existingTextNode = this.cursorEl.previousSibling;
-          }
-          if (existingTextNode) {
-            existingTextNode.textContent += text.charAt(i);
+        if (this._cursorEl) {
+          let previousSibling = this._cursorEl.previousSibling;
+          if (previousSibling && previousSibling.nodeType === Node.TEXT_NODE) {
+            previousSibling.textContent += text.charAt(i);
           } else {
             const newTextNode = document.createTextNode(text.charAt(i));
-            parent.insertBefore(newTextNode, this.cursorEl);
+            parent.insertBefore(newTextNode, this._cursorEl);
           }
         } else {
-          if (this.config.parseHTML)
-            parent.innerHTML = parent.innerHTML + text.charAt(i);
-          else parent.textContent = parent.textContent + text.charAt(i);
+          if (
+            parent.lastChild &&
+            parent.lastChild.nodeType === Node.TEXT_NODE
+          ) {
+            parent.lastChild.textContent += text.charAt(i);
+          } else {
+            const newTextNode = document.createTextNode(text.charAt(i));
+            parent.append(newTextNode);
+          }
         }
 
         i++;
         parent.scrollIntoView({ behavior: "smooth", block: "end" });
-      }, this.speed);
+      }, this.speed));
     });
-  }
-
-  _elementById(id) {
-    if (id.startsWith("#") && id.length > 1) id = id.split("#")[1];
-    return document.getElementById(id);
   }
 
   _onFinish() {
@@ -200,40 +227,147 @@ export class TypeMorph {
   _clearContent() {
     if (!this.parent) return;
     this.parent.innerHTML = "";
-    if (this.cursorEl) this.parent.appendChild(this.cursorEl);
+    if (this._cursorEl) this.parent.appendChild(this._cursorEl);
   }
 
   _clearCursor() {
-    if (this.config.hideCursorOnFinishTyping && this.cursorEl) {
-      this.cursorEl.remove();
-      this.cursorEl = null;
+    if (this.config.hideCursorOnFinishTyping && this._cursorEl) {
+      this._cursorEl.remove();
+      this._cursorEl = null;
     }
   }
 
-  _backspaceContent() {
-    return new Promise((resolve) => {
-      if (!this.parent) return resolve();
+  async _backspaceContent(parent = this.parent) {
+    if (!parent || this._stopped) return;
 
-      const textNodes = Array.from(this.parent.childNodes).filter(
-        (n) => n.nodeType === Node.TEXT_NODE
-      );
+    const children = Array.from(parent.childNodes);
 
-      const step = () => {
-        if (this._stopped) return resolve();
+    for (let i = children.length - 1; i >= 0; i--) {
+      const child = children[i];
+      if (this._stopped) return;
 
-        let done = true;
-        for (let node of textNodes) {
-          if (node.data.length > 0) {
-            node.data = node.data.slice(0, -1);
-            done = false;
+      if (this._cursorEl && child === this._cursorEl) {
+        continue;
+      }
+
+      if (child.nodeType === Node.TEXT_NODE) {
+        await this._backspaceTextNode(child);
+        if (child.textContent.length === 0 && child.parentNode) {
+          child.parentNode.removeChild(child);
+        }
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        await this._backspaceContent(child);
+        if (child.innerHTML.trim().length === 0 && child.parentNode) {
+          if (this._cursorEl && this._cursorEl.parentNode === parent) {
+            parent.removeChild(this._cursorEl);
+          }
+
+          child.parentNode.removeChild(child);
+
+          if (this._cursorEl) {
+            parent.appendChild(this._cursorEl);
           }
         }
+      }
+    }
+  }
 
-        if (done) return resolve();
-        setTimeout(step, this.config.backspaceSpeed);
+  _backspaceTextNode(node) {
+    return new Promise((resolve) => {
+      this._backspaceResolve = resolve;
+
+      if (node.textContent.trim().length === 0) {
+        if (node.parentNode) node.parentNode.removeChild(node);
+        return doneResolve();
+      }
+
+      const currInterval = (this._backspaceInterval = setInterval(() => {
+        if (this._stopped) {
+          return doneResolve();
+        }
+
+        node.textContent = node.textContent.slice(0, -1);
+
+        if (node.textContent.length === 0) {
+          if (this._cursorEl && this._cursorEl.previousSibling === node) {
+            // node is empty
+          } else if (node.parentNode) {
+            node.parentNode.removeChild(node);
+          }
+
+          return doneResolve();
+        }
+      }, this.config.backspaceSpeed));
+
+      const doneResolve = () => {
+        this._clearTypingRefs();
+        if (currInterval) clearInterval(currInterval);
+        console.debug("Resolving => _backspaceTextNode");
+        return resolve();
       };
-
-      step();
     });
+  }
+
+  _clearTypingRefs() {
+    if (this._typingInterval) {
+      clearInterval(this._typingInterval);
+      this._typingInterval = null;
+    }
+    if (this._typingResolve) {
+      this._typingResolve();
+      this._typingResolve = null;
+    }
+    if (this._backspaceInterval) {
+      clearInterval(this._backspaceInterval);
+      this._backspaceInterval = null;
+    }
+    if (this._backspaceResolve) {
+      this._backspaceResolve();
+      this._backspaceResolve = null;
+    }
+    if (this._delayTimer) {
+      clearTimeout(this._delayTimer);
+      this._delayTimer = null;
+    }
+    if (this._delayResolve) {
+      this._delayResolve();
+      this._delayResolve = null;
+    }
+  }
+
+  _setParent(parent) {
+    this.parent =
+      typeof parent === "string" ? document.getElementById(parent) : parent;
+
+    if (!this.parent) {
+      throw new Error("Parent element was not found");
+    }
+  }
+
+  _delay(ms) {
+    return new Promise((resolve) => {
+      this._delayResolve = resolve;
+      this._delayTimer = setTimeout(() => {
+        this._delayTimer = null;
+        resolve();
+      }, ms);
+    });
+  }
+
+  async _yieldToEventLoop() {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  _setText(text) {
+    if (!this.text)
+      throw new Error(
+        "Please provide text either in intialization options, as parameter to start() or when calling type()"
+      );
+
+    this.text = text;
+  }
+
+  _currentlyLooping() {
+    return this.loop && !this._stopped && !this._loopInterrupted;
   }
 }

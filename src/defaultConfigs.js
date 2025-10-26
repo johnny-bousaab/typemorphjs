@@ -11,9 +11,12 @@ export const defaultConfigs = {
   showCursor: true,
   cursorChar: "|",
   parseMarkdown: false,
+  markdownInline: false, // whether to parse markdown inline, can be helpful to avoid unwanted wrappers for simple text
   parseHTML: true,
   markdownParser: null,
   hideCursorOnFinishTyping: true,
-  onStop: (instance) => {}, // on stop event
-  onFinish: (instance) => {}, // on finish event (if stopped, this will not trigger)
+  clearBeforeTyping: true, // is type() was used on same parent, whether to clear text content before typing again
+  onStop: (instance) => {},
+  onFinish: (instance) => {},
+  onDestroy: (instance) => {},
 };

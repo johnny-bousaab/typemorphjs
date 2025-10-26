@@ -30,19 +30,19 @@
 
       const demoText = "**Hello**, this is <i>TypeMorphJS</i>!";
 
-      const typer = new TypeMorph({
+      window.typer = new TypeMorph({
         parent: "output",
         text: demoText,
         speed: 30,
         parseMarkdown: true,
+        markdownInline: true,
         parseHTML: true,
-        showCursor: true,
+        showCursor: false,
         cursorChar: "|",
-        loop: true,
+        loop: false,
         loopType: "backspace",
         loopStartDelay: 1000,
         loopEndDelay: 2000,
-
         onFinish: () => console.log("Typing finished!"),
         onStop: () => console.log("Typing stopped!"),
       });
