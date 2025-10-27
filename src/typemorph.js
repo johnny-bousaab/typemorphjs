@@ -3,230 +3,306 @@ import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
 
 export class TypeMorph {
   constructor(config = {}) {
-    this.config = { ...defaultConfigs, ...config };
+    if (typeof document === "undefined") {
+      throw new Error("TypeMorph requires a DOM environment");
+    }
+
+    this.config = this._deepMerge(defaultConfigs, config);
     this.text = this.config.text;
     this.speed = this.config.speed;
     this.cursorChar = this.config.cursorChar;
     this.loop = this.config.loop;
     this.loopCount = this.config.loopCount;
+    this.chunkSize = this.config.chunkSize;
+
     this._currentLoop = 0;
     this._cursorEl = null;
-    this._stopped = false;
-    this._loopInterrupted = false;
-    this._typingResolve = null;
-    this._backspaceResolve = null;
-    this._typingInterval = null;
-    this._backspaceInterval = null;
-    this._delayResolve = null;
-    this._delayTimer = null;
+    this._abortController = null;
     this._destroyed = false;
-    this._startQueue = Promise.resolve();
-    this._typeQueue = Promise.resolve();
-    this._debugMode = false;
+    this._isTyping = false;
+    this._operationQueue = Promise.resolve();
+    this._activeTimers = new Set();
+    this._activeIntervals = new Set();
+
+    this._validateOptions();
   }
 
   async start(text = null) {
     this._checkLifetime();
-    await this.stop(true);
-    this._startQueue = this._startQueue.then(() => this._start(text));
-    return this._startQueue;
+    await this._cancelCurrentOperation();
+    return this._enqueueOperation(async (signal) => {
+      await this._start(text, signal);
+    });
   }
 
   async type(text, parent = null) {
     this._checkLifetime();
-    await this.stop(true);
-    this._createCursor();
-    this._stopped = false;
-    this._typeQueue = this._typeQueue.then(() => this._type(text, parent));
-    return this._typeQueue;
+    await this._cancelCurrentOperation();
+    return this._enqueueOperation(async (signal) => {
+      this._createCursor();
+      await this._type(text, parent, { startSource: false }, signal);
+    });
   }
 
-  async stop(internalStop = false) {
+  async stop() {
     this._checkLifetime();
-    this._stopped = true;
-    this._loopInterrupted = true;
-    this._clearCursor();
-    this._clearTypingRefs();
-
-    await this._yieldToEventLoop();
-
-    if (!internalStop && typeof this.config.onStop === "function") {
-      this.config.onStop(this);
-    }
+    await this._cancelCurrentOperation();
+    await this._safeCallback(this.config.onStop, this);
   }
 
   destroy() {
-    this.stop(true);
-    if (this._cursorEl) this._cursorEl.remove();
+    if (this._destroyed) return;
+
+    this.stop();
+    if (this._cursorEl && this._cursorEl.parentNode) {
+      this._cursorEl.remove();
+    }
+    this._cursorEl = null;
     this._destroyed = true;
-    this.config.onDestroy?.(this);
+
+    this._safeCallback(this.config.onDestroy, this);
   }
 
-  async _start(text = null) {
+  isTyping() {
+    return this._isTyping;
+  }
+
+  isDestroyed() {
+    return this._destroyed;
+  }
+
+  getCurrentLoop() {
+    return this._currentLoop;
+  }
+
+  async _start(text, signal) {
     this._createCursor();
     this.loop = this.config.loop;
     this._currentLoop = 0;
-    this._stopped = false;
-    this._loopInterrupted = false;
+    this._isTyping = true;
 
     if (this.config.parent) this._setParent(this.config.parent);
 
     this._setText(text ?? this.text);
 
-    if (!this.text) return;
+    if (!this.text) {
+      this._isTyping = false;
+      return;
+    }
 
     if (this.config.clearBeforeTyping) {
       this._clearContent();
     }
 
-    do {
-      if (
-        this._currentlyLooping() &&
-        this._currentLoop > 0 &&
-        this.config.loopStartDelay
-      ) {
-        await this._delay(this.config.loopStartDelay);
-      }
+    try {
+      do {
+        if (signal.aborted) break;
 
-      await this._type(this.text, null, { startSource: true });
-
-      if (this._currentlyLooping() && this.config.loopEndDelay) {
-        await this._delay(this.config.loopEndDelay);
-      }
-
-      if (this._currentlyLooping() && this._currentLoop + 1 < this.loopCount) {
-        if (this.config.loopType === "clear") {
-          this._clearContent();
-        } else {
-          await this._backspaceContent();
+        if (
+          this._currentlyLooping() &&
+          this._currentLoop > 0 &&
+          this.config.loopStartDelay
+        ) {
+          await this._delay(this.config.loopStartDelay, signal);
         }
+
+        await this._type(this.text, null, { startSource: true }, signal);
+
+        if (signal.aborted) break;
+
+        if (this._currentlyLooping() && this.config.loopEndDelay) {
+          await this._delay(this.config.loopEndDelay, signal);
+        }
+
+        if (
+          this._currentlyLooping() &&
+          this._currentLoop + 1 < this.loopCount
+        ) {
+          if (this.config.loopType === "clear") {
+            this._clearContent();
+          } else {
+            await this._backspaceContent(this.parent, signal);
+          }
+        }
+
+        this._currentLoop++;
+      } while (
+        this._currentlyLooping() &&
+        this._currentLoop < this.loopCount &&
+        !signal.aborted
+      );
+
+      if (!signal.aborted) {
+        await this._onFinish();
       }
-
-      this._currentLoop++;
-    } while (this._currentlyLooping() && this._currentLoop < this.loopCount);
-
-    if (!this._stopped && !this._loopInterrupted) this._onFinish();
-
-    if (this._debugMode) console.debug("Resolving => _start");
+    } finally {
+      this._isTyping = false;
+      if (this.config.debug) {
+        console.debug("TypeMorph: _start() ended");
+      }
+    }
   }
 
-  async _type(newText, parent = null, options = {}) {
+  async _type(newText, parent = null, options = {}, signal) {
     this._setParent(parent ?? this.config.parent);
     this._setText(newText);
+    this._isTyping = true;
 
-    if (this.config.clearBeforeTyping && !this._currentlyLooping()) {
+    if (this.config.clearBeforeTyping && !options.startSource) {
       this._clearContent();
     }
 
-    let contentToType = this.text;
-    if (this.config.parseMarkdown) {
-      const parser = this.config.markdownParser || marked;
-      contentToType = this.config.markdownInline
-        ? parser.parseInline(contentToType)
-        : parser.parse(contentToType);
-    }
+    try {
+      let contentToType = this.text;
 
-    if (this.config.parseHTML) {
-      await this._typeHTML(contentToType);
-    } else {
-      await this._typeText(contentToType);
-    }
+      if (this.config.parseMarkdown) {
+        const parser = this.config.markdownParser || marked;
+        const parseMethod = this.config.markdownInline
+          ? "parseInline"
+          : "parse";
 
-    if (!options.startSource && !this._stopped) {
-      this._onFinish();
+        const result = parser[parseMethod](contentToType);
+        contentToType = result instanceof Promise ? await result : result;
+      }
+
+      if (this.config.parseHTML) {
+        await this._typeHTML(contentToType, signal);
+      } else {
+        await this._typeText(contentToType, this.parent, signal);
+      }
+
+      if (!options.startSource && !signal.aborted) {
+        await this._onFinish();
+      }
+    } finally {
+      if (!options.startSource) {
+        this._isTyping = false;
+      }
     }
   }
 
   _createCursor() {
     if (!this.config.showCursor || this._cursorEl) return;
+
     this._cursorEl = document.createElement("span");
     this._cursorEl.textContent = this.cursorChar;
     this._cursorEl.className = "typemorph-cursor";
+    this._cursorEl.setAttribute("data-typemorph-cursor", "true");
   }
 
-  async _typeHTML(html) {
+  async _typeHTML(html, signal) {
+    if (this.config.debug) {
+      console.warn(
+        "TypeMorph: Inserting HTML without sanitization. TODO: Ensure content is trusted."
+      );
+    }
+
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
-    await this._typeNode(this.parent, doc.body);
+    await this._typeNode(this.parent, doc.body, signal);
   }
 
-  async _typeNode(parent, node) {
-    for (let child of node.childNodes) {
-      if (this._stopped) break;
+  async _typeNode(parent, node, signal) {
+    const children = Array.from(node.childNodes);
+
+    for (let child of children) {
+      if (signal.aborted) break;
+
       if (
         child.nodeType === Node.TEXT_NODE &&
         child.textContent.trim().length > 0
       ) {
-        await this._typeText(child.textContent, parent);
+        await this._typeText(child.textContent, parent, signal);
       } else if (child.nodeType === Node.ELEMENT_NODE) {
         const el = document.createElement(child.tagName);
+
         for (let attr of child.attributes) {
-          el.setAttribute(attr.name, attr.value);
+          try {
+            el.setAttribute(attr.name, attr.value);
+          } catch (e) {
+            if (this.config.debug) {
+              console.warn("TypeMorph: Failed to set attribute", attr.name, e);
+            }
+          }
         }
 
-        if (
-          this._cursorEl &&
-          this._cursorEl.parentNode === parent &&
-          this._cursorEl.nextSibling === null
-        ) {
-          parent.removeChild(this._cursorEl);
+        const cursorWasHere = this._cursorEl?.parentNode === parent;
+        if (cursorWasHere && this._cursorEl) {
+          this._cursorEl.remove();
         }
 
         parent.appendChild(el);
-        await this._typeNode(el, child);
+        await this._typeNode(el, child, signal);
+
+        if (cursorWasHere && this._cursorEl) {
+          parent.appendChild(this._cursorEl);
+        }
       }
     }
   }
 
-  _typeText(text, parent = this.parent) {
-    return new Promise((resolve) => {
-      this._typingResolve = resolve;
+  async _typeText(text, parent = this.parent, signal) {
+    if (!text || signal.aborted) return;
 
-      let i = 0;
-      if (this._cursorEl) {
-        if (this._cursorEl.parentNode) {
-          this._cursorEl.parentNode.removeChild(this._cursorEl);
-        }
-        parent.appendChild(this._cursorEl);
+    if (this._cursorEl) {
+      if (this._cursorEl.parentNode) {
+        this._cursorEl.remove();
       }
-      const currTypingInterval = (this._typingInterval = setInterval(() => {
-        if (this._stopped || i >= text.length) {
-          this._clearTypingRefs();
-          if (currTypingInterval) clearInterval(currTypingInterval);
-          if (this._debugMode) console.debug("Resolving => _typeText");
-          return resolve();
-        }
+      parent.appendChild(this._cursorEl);
+    }
 
-        if (this._cursorEl) {
-          let previousSibling = this._cursorEl.previousSibling;
-          if (previousSibling && previousSibling.nodeType === Node.TEXT_NODE) {
-            previousSibling.textContent += text.charAt(i);
-          } else {
-            const newTextNode = document.createTextNode(text.charAt(i));
-            parent.insertBefore(newTextNode, this._cursorEl);
-          }
-        } else {
-          if (
-            parent.lastChild &&
-            parent.lastChild.nodeType === Node.TEXT_NODE
-          ) {
-            parent.lastChild.textContent += text.charAt(i);
-          } else {
-            const newTextNode = document.createTextNode(text.charAt(i));
-            parent.append(newTextNode);
-          }
-        }
+    const chars = Array.from(text);
+    let buffer = "";
+    let scrollCounter = 0;
+    const scrollInterval = 10;
 
-        i++;
-      }, this.speed));
-    });
+    for (let i = 0; i < chars.length; i++) {
+      if (signal.aborted) break;
+
+      buffer += chars[i];
+
+      if (buffer.length >= this.chunkSize || i === chars.length - 1) {
+        this._appendTextToParent(parent, buffer);
+        buffer = "";
+        scrollCounter++;
+        if (this.config.autoScroll && scrollCounter >= scrollInterval) {
+          parent.scrollIntoView({ behavior: "smooth", block: "end" });
+          scrollCounter = 0;
+        }
+      }
+
+      if (i < chars.length - 1) {
+        await this._delay(this.speed, signal);
+      }
+    }
+
+    if (this.config.autoScroll) {
+      parent.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
   }
 
-  _onFinish() {
+  _appendTextToParent(parent, text) {
+    if (this._cursorEl) {
+      let previousSibling = this._cursorEl.previousSibling;
+      if (previousSibling && previousSibling.nodeType === Node.TEXT_NODE) {
+        previousSibling.textContent += text;
+      } else {
+        const newTextNode = document.createTextNode(text);
+        parent.insertBefore(newTextNode, this._cursorEl);
+      }
+    } else {
+      if (parent.lastChild && parent.lastChild.nodeType === Node.TEXT_NODE) {
+        parent.lastChild.textContent += text;
+      } else {
+        const newTextNode = document.createTextNode(text);
+        parent.appendChild(newTextNode);
+      }
+    }
+  }
+
+  async _onFinish() {
     this._clearCursor();
-    if (typeof this.config.onFinish === "function") {
-      this.config.onFinish(this);
-    }
+    await this._safeCallback(this.config.onFinish, this);
   }
 
   _clearContent() {
@@ -242,29 +318,29 @@ export class TypeMorph {
     }
   }
 
-  async _backspaceContent(parent = this.parent) {
-    if (!parent || this._stopped) return;
+  async _backspaceContent(parent = this.parent, signal) {
+    if (!parent || signal.aborted) return;
 
     const children = Array.from(parent.childNodes);
 
     for (let i = children.length - 1; i >= 0; i--) {
       const child = children[i];
-      if (this._stopped) return;
+      if (signal.aborted) return;
 
       if (this._cursorEl && child === this._cursorEl) {
         continue;
       }
 
       if (child.nodeType === Node.TEXT_NODE) {
-        await this._backspaceTextNode(child);
+        await this._backspaceTextNode(child, signal);
         if (child.textContent.length === 0 && child.parentNode) {
           child.parentNode.removeChild(child);
         }
       } else if (child.nodeType === Node.ELEMENT_NODE) {
-        await this._backspaceContent(child);
+        await this._backspaceContent(child, signal);
         if (child.innerHTML.trim().length === 0 && child.parentNode) {
           if (this._cursorEl && this._cursorEl.parentNode === parent) {
-            parent.removeChild(this._cursorEl);
+            this._cursorEl.remove();
           }
 
           child.parentNode.removeChild(child);
@@ -277,66 +353,23 @@ export class TypeMorph {
     }
   }
 
-  _backspaceTextNode(node) {
-    return new Promise((resolve) => {
-      this._backspaceResolve = resolve;
-
-      if (node.textContent.trim().length === 0) {
-        if (node.parentNode) node.parentNode.removeChild(node);
-        return doneResolve();
-      }
-
-      const currInterval = (this._backspaceInterval = setInterval(() => {
-        if (this._stopped) {
-          return doneResolve();
-        }
-
-        node.textContent = node.textContent.slice(0, -1);
-
-        if (node.textContent.length === 0) {
-          if (this._cursorEl && this._cursorEl.previousSibling === node) {
-            // node is empty
-          } else if (node.parentNode) {
-            node.parentNode.removeChild(node);
-          }
-
-          return doneResolve();
-        }
-      }, this.config.backspaceSpeed));
-
-      const doneResolve = () => {
-        this._clearTypingRefs();
-        if (currInterval) clearInterval(currInterval);
-        if (this._debugMode) console.debug("Resolving => _backspaceTextNode");
-        return resolve();
-      };
-    });
-  }
-
-  _clearTypingRefs() {
-    if (this._typingInterval) {
-      clearInterval(this._typingInterval);
-      this._typingInterval = null;
+  async _backspaceTextNode(node, signal) {
+    if (node.textContent.trim().length === 0) {
+      if (node.parentNode) node.parentNode.removeChild(node);
+      return;
     }
-    if (this._typingResolve) {
-      this._typingResolve();
-      this._typingResolve = null;
+
+    const chars = Array.from(node.textContent);
+
+    for (let i = chars.length - 1; i >= 0; i--) {
+      if (signal.aborted) break;
+
+      node.textContent = chars.slice(0, i).join("");
+      await this._delay(this.config.backspaceSpeed, signal);
     }
-    if (this._backspaceInterval) {
-      clearInterval(this._backspaceInterval);
-      this._backspaceInterval = null;
-    }
-    if (this._backspaceResolve) {
-      this._backspaceResolve();
-      this._backspaceResolve = null;
-    }
-    if (this._delayTimer) {
-      clearTimeout(this._delayTimer);
-      this._delayTimer = null;
-    }
-    if (this._delayResolve) {
-      this._delayResolve();
-      this._delayResolve = null;
+
+    if (node.parentNode && node.textContent.length === 0) {
+      node.parentNode.removeChild(node);
     }
   }
 
@@ -345,42 +378,138 @@ export class TypeMorph {
       typeof parent === "string" ? document.getElementById(parent) : parent;
 
     if (!this.parent) {
-      throw new Error("Parent element was not found");
+      throw new Error("TypeMorph: Parent element not found");
     }
   }
 
-  _delay(ms) {
-    return new Promise((resolve) => {
-      this._delayResolve = resolve;
-      this._delayTimer = setTimeout(() => {
-        this._delayTimer = null;
-        resolve();
-      }, ms);
-    });
-  }
-
-  async _yieldToEventLoop() {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  }
-
   _setText(text) {
-    if (!text || typeof text !== "string")
-      throw new Error(
-        "Please provide text string either in intialization options, as parameter to start() or when calling type()"
-      );
-
+    if (!text || typeof text !== "string") {
+      throw new Error("TypeMorph: Please provide a valid text string");
+    }
     this.text = text;
   }
 
   _currentlyLooping() {
-    return this.loop && !this._stopped && !this._loopInterrupted;
+    return this.loop && this._isTyping;
   }
 
   _checkLifetime() {
     if (this._destroyed) {
-      throw new Error(
-        "TypeMorph Error: Cannot call method—instance has been destroyed."
-      );
+      throw new Error("TypeMorph: Cannot call method on destroyed instance");
     }
+  }
+
+  async _delay(ms, signal) {
+    if (signal.aborted) return;
+
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this._activeTimers.delete(timer);
+        resolve();
+      }, ms);
+
+      this._activeTimers.add(timer);
+
+      signal.addEventListener(
+        "abort",
+        () => {
+          clearTimeout(timer);
+          this._activeTimers.delete(timer);
+          resolve();
+        },
+        { once: true }
+      );
+    });
+  }
+
+  async _enqueueOperation(operation) {
+    await this._operationQueue.catch(() => {});
+    this._abortController = new AbortController();
+    this._operationQueue = (async () => {
+      try {
+        await operation(this._abortController.signal);
+      } catch (error) {
+        if (this.config.debug && error.name !== "AbortError") {
+          console.error("TypeMorph: Operation error:", error);
+        }
+      }
+    })();
+
+    return this._operationQueue;
+  }
+
+  _clearAllTracked() {
+    for (const timer of this._activeTimers) {
+      clearTimeout(timer);
+    }
+    this._activeTimers.clear();
+
+    for (const interval of this._activeIntervals) {
+      clearInterval(interval);
+    }
+    this._activeIntervals.clear();
+  }
+
+  async _cancelCurrentOperation() {
+    if (this._abortController) {
+      this._abortController.abort();
+    }
+
+    this._clearAllTracked();
+
+    await this._operationQueue.catch(() => {});
+
+    this._isTyping = false;
+    this._clearCursor();
+  }
+
+  async _safeCallback(callback, ...args) {
+    if (typeof callback === "function") {
+      try {
+        const result = callback(...args);
+        if (result instanceof Promise) {
+          await result;
+        }
+      } catch (error) {
+        if (this.config.debug) {
+          console.error("TypeMorph: Callback error:", error);
+        }
+      }
+    }
+  }
+
+  _deepMerge(target, source) {
+    const output = { ...target };
+
+    if (this._isObject(target) && this._isObject(source)) {
+      Object.keys(source).forEach((key) => {
+        if (this._isObject(source[key])) {
+          if (!(key in target)) {
+            output[key] = source[key];
+          } else {
+            output[key] = this._deepMerge(target[key], source[key]);
+          }
+        } else {
+          output[key] = source[key];
+        }
+      });
+    }
+
+    return output;
+  }
+
+  _isObject(item) {
+    return item && typeof item === "object" && !Array.isArray(item);
+  }
+
+  _validateOptions() {
+    if (typeof this.chunkSize != "number" || this.chunkSize < 1)
+      throw new Error("TypeMorph: chunkSize has to be a number > 0");
+
+    if (typeof this.loopCount != "number" || this.loopCount < 0)
+      throw new Error("TypeMorph: loopCount has to be a number >= 0");
+
+    if (typeof this.speed != "number" || this.speed < 0)
+      throw new Error("TypeMorph: speed has to be a number >= 0");
   }
 }

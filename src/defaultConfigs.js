@@ -15,6 +15,7 @@ export const defaultConfigs = {
   parseHTML: true,
   markdownParser: null,
   hideCursorOnFinishTyping: true,
+  autoScroll: true,
   clearBeforeTyping: true, // is type() was used on same parent, whether to clear text content before typing again
   onStop: (instance) => {},
   onFinish: (instance) => {},
