@@ -19,17 +19,21 @@ export class TypeMorph {
     this._backspaceInterval = null;
     this._delayResolve = null;
     this._delayTimer = null;
+    this._destroyed = false;
     this._startQueue = Promise.resolve();
     this._typeQueue = Promise.resolve();
+    this._debugMode = false;
   }
 
   async start(text = null) {
+    this._checkLifetime();
     await this.stop(true);
     this._startQueue = this._startQueue.then(() => this._start(text));
     return this._startQueue;
   }
 
   async type(text, parent = null) {
+    this._checkLifetime();
     await this.stop(true);
     this._createCursor();
     this._stopped = false;
@@ -38,6 +42,7 @@ export class TypeMorph {
   }
 
   async stop(internalStop = false) {
+    this._checkLifetime();
     this._stopped = true;
     this._loopInterrupted = true;
     this._clearCursor();
@@ -53,6 +58,7 @@ export class TypeMorph {
   destroy() {
     this.stop(true);
     if (this._cursorEl) this._cursorEl.remove();
+    this._destroyed = true;
     this.config.onDestroy?.(this);
   }
 
@@ -101,7 +107,7 @@ export class TypeMorph {
 
     if (!this._stopped && !this._loopInterrupted) this._onFinish();
 
-    console.debug("Resolving => _start");
+    if (this._debugMode) console.debug("Resolving => _start");
   }
 
   async _type(newText, parent = null, options = {}) {
@@ -187,7 +193,7 @@ export class TypeMorph {
         if (this._stopped || i >= text.length) {
           this._clearTypingRefs();
           if (currTypingInterval) clearInterval(currTypingInterval);
-          console.debug("Resolving => _typeText");
+          if (this._debugMode) console.debug("Resolving => _typeText");
           return resolve();
         }
 
@@ -212,7 +218,6 @@ export class TypeMorph {
         }
 
         i++;
-        parent.scrollIntoView({ behavior: "smooth", block: "end" });
       }, this.speed));
     });
   }
@@ -302,7 +307,7 @@ export class TypeMorph {
       const doneResolve = () => {
         this._clearTypingRefs();
         if (currInterval) clearInterval(currInterval);
-        console.debug("Resolving => _backspaceTextNode");
+        if (this._debugMode) console.debug("Resolving => _backspaceTextNode");
         return resolve();
       };
     });
@@ -359,9 +364,9 @@ export class TypeMorph {
   }
 
   _setText(text) {
-    if (!this.text)
+    if (!text || typeof text !== "string")
       throw new Error(
-        "Please provide text either in intialization options, as parameter to start() or when calling type()"
+        "Please provide text string either in intialization options, as parameter to start() or when calling type()"
       );
 
     this.text = text;
@@ -369,5 +374,13 @@ export class TypeMorph {
 
   _currentlyLooping() {
     return this.loop && !this._stopped && !this._loopInterrupted;
+  }
+
+  _checkLifetime() {
+    if (this._destroyed) {
+      throw new Error(
+        "TypeMorph Error: Cannot call method—instance has been destroyed."
+      );
+    }
   }
 }
