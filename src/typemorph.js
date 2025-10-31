@@ -1,6 +1,12 @@
 import { defaultConfigs } from "./defaultConfigs.js";
 import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
+import dompurify from "https://cdn.jsdelivr.net/npm/dompurify@3.3.0/+esm";
 
+/**
+ * TypeMorph: Core typing animation
+ * Handles typing, backspacing, and looping animations
+ * Supports Makrdown/HTML parsing
+ */
 export class TypeMorph {
   constructor(config = {}) {
     if (typeof document === "undefined") {
@@ -11,9 +17,9 @@ export class TypeMorph {
     this.text = this.config.text;
     this.speed = this.config.speed;
     this.cursorChar = this.config.cursorChar;
-    this.loop = this.config.loop;
     this.loopCount = this.config.loopCount;
     this.chunkSize = this.config.chunkSize;
+    this.scrollInterval = this.config.scrollInterval;
 
     this._currentLoop = 0;
     this._cursorEl = null;
@@ -27,14 +33,11 @@ export class TypeMorph {
     this._validateOptions();
   }
 
-  async start(text = null) {
-    this._checkLifetime();
-    await this._cancelCurrentOperation();
-    return this._enqueueOperation(async (signal) => {
-      await this._start(text, signal);
-    });
-  }
-
+  /**
+   * Type text character by character
+   * @param {string} text - Text to type
+   * @param {HTMLElement|string} parent - Parent element or selector
+   */
   async type(text, parent = null) {
     this._checkLifetime();
     await this._cancelCurrentOperation();
@@ -44,19 +47,45 @@ export class TypeMorph {
     });
   }
 
+  /**
+   * Stop current operation
+   */
   async stop() {
     this._checkLifetime();
     await this._cancelCurrentOperation();
     await this._safeCallback(this.config.onStop, this);
   }
 
+  /**
+   * Loop typing animation
+   * @param {string} text - Text to type in loop
+   * @param {HTMLElement|string} parent - Parent element or selector
+   */
+  async loop(text = null, parent = null) {
+    this._checkLifetime();
+    await this._cancelCurrentOperation();
+    return this._enqueueOperation(async (signal) => {
+      await this._loop(text, parent, signal);
+    });
+  }
+
+  /**
+   * Destroy the instance and cleanup
+   */
   destroy() {
     if (this._destroyed) return;
 
     this.stop();
+
+    if (this._abortController) {
+      if (!this._abortController.signal.aborted) this._abortController.abort();
+      this._abortController = null;
+    }
+
     if (this._cursorEl && this._cursorEl.parentNode) {
       this._cursorEl.remove();
     }
+
     this._cursorEl = null;
     this._destroyed = true;
 
@@ -75,14 +104,12 @@ export class TypeMorph {
     return this._currentLoop;
   }
 
-  async _start(text, signal) {
+  async _loop(text, parent, signal) {
     this._createCursor();
-    this.loop = this.config.loop;
     this._currentLoop = 0;
     this._isTyping = true;
 
-    if (this.config.parent) this._setParent(this.config.parent);
-
+    this._setParent(parent ?? this.config.parent);
     this._setText(text ?? this.text);
 
     if (!this.text) {
@@ -138,17 +165,21 @@ export class TypeMorph {
     } finally {
       this._isTyping = false;
       if (this.config.debug) {
-        console.debug("TypeMorph: _start() ended");
+        console.debug("TypeMorph: _loop() ended");
       }
     }
   }
 
-  async _type(newText, parent = null, options = {}, signal) {
+  async _type(text, parent = null, options = {}, signal) {
     this._setParent(parent ?? this.config.parent);
-    this._setText(newText);
+    this._setText(text);
     this._isTyping = true;
 
-    if (this.config.clearBeforeTyping && !options.startSource) {
+    if (
+      this.config.clearBeforeTyping &&
+      !options.startSource &&
+      !signal.aborted
+    ) {
       this._clearContent();
     }
 
@@ -156,12 +187,14 @@ export class TypeMorph {
       let contentToType = this.text;
 
       if (this.config.parseMarkdown) {
-        const parser = this.config.markdownParser || marked;
         const parseMethod = this.config.markdownInline
           ? "parseInline"
           : "parse";
 
-        const result = parser[parseMethod](contentToType);
+        const result = this.config.markdownParse
+          ? this.config.markdownParse(contentToType, this.config.markdownInline)
+          : marked[parseMethod](contentToType);
+
         contentToType = result instanceof Promise ? await result : result;
       }
 
@@ -191,10 +224,10 @@ export class TypeMorph {
   }
 
   async _typeHTML(html, signal) {
-    if (this.config.debug) {
-      console.warn(
-        "TypeMorph: Inserting HTML without sanitization. TODO: Ensure content is trusted."
-      );
+    if (!this.config.trustedHTML) {
+      html = this.config.htmlSanitize
+        ? this.config.htmlSanitize(html)
+        : dompurify.sanitize(html);
     }
 
     const parser = new DOMParser();
@@ -204,6 +237,7 @@ export class TypeMorph {
 
   async _typeNode(parent, node, signal) {
     const children = Array.from(node.childNodes);
+    let cursorReattached = false;
 
     for (let child of children) {
       if (signal.aborted) break;
@@ -226,18 +260,24 @@ export class TypeMorph {
           }
         }
 
-        const cursorWasHere = this._cursorEl?.parentNode === parent;
-        if (cursorWasHere && this._cursorEl) {
-          this._cursorEl.remove();
-        }
+        // const cursorWasHere = this._cursorEl?.parentNode === parent;
+        // if (cursorWasHere && this._cursorEl) {
+        //   this._cursorEl.remove();
+        // }
 
         parent.appendChild(el);
         await this._typeNode(el, child, signal);
 
-        if (cursorWasHere && this._cursorEl) {
-          parent.appendChild(this._cursorEl);
-        }
+        cursorReattached = true;
+
+        // if (cursorWasHere && this._cursorEl) {
+        //   parent.appendChild(this._cursorEl);
+        // }
       }
+    }
+
+    if (cursorReattached && this._cursorEl && !this._cursorEl.parentNode) {
+      parent.appendChild(this._cursorEl);
     }
   }
 
@@ -254,7 +294,6 @@ export class TypeMorph {
     const chars = Array.from(text);
     let buffer = "";
     let scrollCounter = 0;
-    const scrollInterval = 10;
 
     for (let i = 0; i < chars.length; i++) {
       if (signal.aborted) break;
@@ -265,7 +304,7 @@ export class TypeMorph {
         this._appendTextToParent(parent, buffer);
         buffer = "";
         scrollCounter++;
-        if (this.config.autoScroll && scrollCounter >= scrollInterval) {
+        if (this.config.autoScroll && scrollCounter >= this.scrollInterval) {
           parent.scrollIntoView({ behavior: "smooth", block: "end" });
           scrollCounter = 0;
         }
@@ -351,25 +390,63 @@ export class TypeMorph {
         }
       }
     }
+
+    this._cleanEmptyTextNodes(parent);
+  }
+
+  _cleanEmptyTextNodes(parent) {
+    const children = Array.from(parent.childNodes);
+    children.forEach((child) => {
+      if (
+        child.nodeType === Node.TEXT_NODE &&
+        (!child.textContent || child.textContent.trim().length === 0)
+      ) {
+        child.parentNode.removeChild(child);
+      }
+    });
   }
 
   async _backspaceTextNode(node, signal) {
-    if (node.textContent.trim().length === 0) {
+    if (!node.textContent || node.textContent.trim().length === 0) {
       if (node.parentNode) node.parentNode.removeChild(node);
       return;
     }
 
     const chars = Array.from(node.textContent);
+    let deleteCount = 0;
+    let scrollCounter = 0;
 
-    for (let i = chars.length - 1; i >= 0; i--) {
+    for (let i = chars.length - 1; i >= 0; i -= this.chunkSize) {
       if (signal.aborted) break;
 
-      node.textContent = chars.slice(0, i).join("");
-      await this._delay(this.config.backspaceSpeed, signal);
+      const chunkStart = Math.max(0, i - this.chunkSize + 1);
+      const charsToKeep = chars.slice(0, chunkStart);
+
+      node.textContent = charsToKeep.join("");
+      deleteCount += i - chunkStart + 1;
+
+      scrollCounter++;
+      if (this.config.autoScroll && scrollCounter >= this.scrollInterval) {
+        if (node.parentNode) {
+          node.parentNode.scrollIntoView({ behavior: "smooth", block: "end" });
+        }
+        scrollCounter = 0;
+      }
+
+      if (chunkStart > 0) {
+        await this._delay(this.config.backspaceSpeed, signal);
+      }
     }
 
-    if (node.parentNode && node.textContent.length === 0) {
+    if (
+      node.parentNode &&
+      (!node.textContent || node.textContent.length === 0)
+    ) {
       node.parentNode.removeChild(node);
+    }
+
+    if (this.config.autoScroll && node.parentNode) {
+      node.parentNode.scrollIntoView({ behavior: "smooth", block: "end" });
     }
   }
 
@@ -378,6 +455,11 @@ export class TypeMorph {
       typeof parent === "string" ? document.getElementById(parent) : parent;
 
     if (!this.parent) {
+      if (typeof parent === "string")
+        throw new Error(
+          `TypeMorph: Parent element not found for selector #${parent}`
+        );
+
       throw new Error("TypeMorph: Parent element not found");
     }
   }
@@ -390,7 +472,7 @@ export class TypeMorph {
   }
 
   _currentlyLooping() {
-    return this.loop && this._isTyping;
+    return this._isTyping;
   }
 
   _checkLifetime() {

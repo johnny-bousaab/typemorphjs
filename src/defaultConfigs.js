@@ -1,23 +1,28 @@
 export const defaultConfigs = {
   text: "Hello from TypeMorphJS!",
-  parent: null, // HTMLElement or string
+  parent: null, // HTML element or string
   speed: 50, // ms per character
+  chunkSize: 1,
   loop: false,
   loopCount: Infinity,
   loopType: "clear", // "clear" or "backspace"
-  loopStartDelay: 500, // ms to wait before typing again, after backspacing/clearing, in each loop
+  loopStartDelay: 300, // ms to wait before typing again, after backspacing/clearing, in each loop
   loopEndDelay: 800, // ms to wait after typing, before backspacing/clearing, in each loop
-  backspaceSpeed: 25, // speed per character when backspacing. Used when loopType is "backspace"
+  backspaceSpeed: 50, // speed per character when backspacing. Used when loopType is "backspace"
   showCursor: true,
   cursorChar: "|",
   parseMarkdown: false,
   markdownInline: false, // whether to parse markdown inline, can be helpful to avoid unwanted wrappers for simple text
   parseHTML: true,
-  markdownParser: null,
+  markdownParse: null, // custom markdown parse function -> markdownParse(text, inline = false)
   hideCursorOnFinishTyping: true,
   autoScroll: true,
-  clearBeforeTyping: true, // is type() was used on same parent, whether to clear text content before typing again
-  onStop: (instance) => {},
-  onFinish: (instance) => {},
-  onDestroy: (instance) => {},
+  scrollInterval: 1, // characters typed before scroll is triggered when typing
+  clearBeforeTyping: true, // if type() was used on same parent, whether to clear text content before typing again
+  debug: false,
+  trustedHTML: false, // if true, html is not sanitized
+  htmlSanitize: null, // custom html sanitize function -> htmlSanitize(html)
+  onStop: (instance) => {}, // typing has been stopped callback
+  onFinish: (instance) => {}, // typing naturally finished callback
+  onDestroy: (instance) => {}, // on instance destroy callback
 };

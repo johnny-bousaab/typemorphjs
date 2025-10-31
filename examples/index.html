@@ -9,6 +9,8 @@
         border: 1px solid #ccc;
         padding: 10px;
         min-height: 40px;
+        overflow-x: hidden;
+        overflow-y: scroll;
       }
       .typemorph-cursor {
         display: inline-block;
@@ -40,17 +42,17 @@
         showCursor: true,
         cursorChar: "|",
         hideCursorOnFinishTyping: false,
-        loop: true,
         loopType: "backspace",
         loopStartDelay: 1000,
         loopEndDelay: 2000,
         chunkSize: 1,
         debug: true,
+        autoScroll: true,
         onFinish: () => console.log("Typing finished!"),
         onStop: () => console.log("Typing stopped!"),
       });
 
-      typer.start();
+      typer.loop();
     </script>
   </body>
 </html>
