@@ -40,29 +40,39 @@
 				  </ul>
 				</nav>`;
 
+      // window.typer = new TypeMorph({
+      //   parent: document.getElementById("output"),
+      //   text: demoText,
+      //   speed: 100,
+      //   backspaceSpeed: 50,
+      //   parseMarkdown: true,
+      //   markdownInline: true,
+      //   parseHTML: true,
+      //   showCursor: true,
+      //   cursorChar: "|",
+      //   hideCursorOnFinishTyping: true,
+      //   loopType: "backspace",
+      //   loopStartDelay: 1000,
+      //   loopEndDelay: 2000,
+      //   loopCount: 2,
+      //   chunkSize: 1,
+      //   debug: true,
+      //   autoScroll: true,
+      //   onFinish: () => console.log("Typing finished!"),
+      //   onStop: () => console.log("Typing stopped!"),
+      // });
+
       window.typer = new TypeMorph({
-        parent: "output",
-        text: demoText,
-        speed: 100,
-        backspaceSpeed: 50,
-        parseMarkdown: true,
-        markdownInline: true,
-        parseHTML: true,
-        showCursor: true,
-        cursorChar: "|",
+        parent: document.getElementById("output"),
+        speed: 10,
+        backspaceSpeed: 10,
+        clearBeforeTyping: true,
         hideCursorOnFinishTyping: true,
-        loopType: "backspace",
-        loopStartDelay: 1000,
-        loopEndDelay: 2000,
         loopCount: 2,
-        chunkSize: 1,
-        debug: true,
-        autoScroll: true,
-        onFinish: () => console.log("Typing finished!"),
-        onStop: () => console.log("Typing stopped!"),
+        debug: false,
       });
 
-      typer.loop();
+      typer.type("Hello world");
     </script>
   </body>
 </html>

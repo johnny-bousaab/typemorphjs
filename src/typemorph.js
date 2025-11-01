@@ -1,6 +1,7 @@
 import { defaultConfigs } from "./defaultConfigs.js";
-import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
-import dompurify from "https://cdn.jsdelivr.net/npm/dompurify@3.3.0/+esm";
+import { loadDeps } from "./helpers.js";
+
+const { marked, DOMPurify } = await loadDeps();
 
 /**
  * TypeMorph: Core typing animation
@@ -13,7 +14,10 @@ export class TypeMorph {
       throw new Error("TypeMorph requires a DOM environment");
     }
 
-    this.config = this._deepMerge(defaultConfigs, config);
+    this.config = { ...defaultConfigs, ...config };
+
+    if (this.config.parent) this._setParent(this.config.parent);
+
     this.text = this.config.text;
     this.speed = this.config.speed;
     this.cursorChar = this.config.cursorChar;
@@ -43,7 +47,7 @@ export class TypeMorph {
     await this._cancelCurrentOperation();
     return this._enqueueOperation(async (signal) => {
       this._createCursor();
-      await this._type(text, parent, { startSource: false }, signal);
+      await this._type(text, parent, { loopSource: false }, signal);
     });
   }
 
@@ -109,7 +113,7 @@ export class TypeMorph {
     this._currentLoop = 0;
     this._isTyping = true;
 
-    this._setParent(parent ?? this.config.parent);
+    this._setParent(parent ?? this.parent);
     this._setText(text ?? this.text);
 
     if (!this.text) {
@@ -133,7 +137,7 @@ export class TypeMorph {
           await this._delay(this.config.loopStartDelay, signal);
         }
 
-        await this._type(this.text, null, { startSource: true }, signal);
+        await this._type(this.text, null, { loopSource: true }, signal);
 
         if (signal.aborted) break;
 
@@ -175,13 +179,13 @@ export class TypeMorph {
   }
 
   async _type(text, parent = null, options = {}, signal) {
-    this._setParent(parent ?? this.config.parent);
+    this._setParent(parent ?? this.parent);
     this._setText(text);
     this._isTyping = true;
 
     if (
       this.config.clearBeforeTyping &&
-      !options.startSource &&
+      !options.loopSource &&
       !signal.aborted
     ) {
       this._clearContent();
@@ -208,11 +212,11 @@ export class TypeMorph {
         await this._typeText(contentToType, this.parent, signal);
       }
 
-      if (!options.startSource && !signal.aborted) {
+      if (!options.loopSource && !signal.aborted) {
         await this._onFinish();
       }
     } finally {
-      if (!options.startSource) {
+      if (!options.loopSource) {
         this._isTyping = false;
       }
     }
@@ -231,7 +235,7 @@ export class TypeMorph {
     if (!this.config.trustedHTML) {
       html = this.config.htmlSanitize
         ? this.config.htmlSanitize(html)
-        : dompurify.sanitize(html);
+        : DOMPurify.sanitize(html);
     }
 
     const parser = new DOMParser();
@@ -497,7 +501,7 @@ export class TypeMorph {
     this.parent =
       typeof parent === "string" ? document.getElementById(parent) : parent;
 
-    if (!this.parent) {
+    if (!this.parent || !this.parent instanceof Element) {
       if (typeof parent === "string")
         throw new Error(
           `TypeMorph: Parent element not found for selector #${parent}`
@@ -529,6 +533,7 @@ export class TypeMorph {
 
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
+        console.log("DONEEEEE");
         this._activeTimers.delete(timer);
         resolve();
       }, ms);
@@ -554,7 +559,7 @@ export class TypeMorph {
       try {
         await operation(this._abortController.signal);
       } catch (error) {
-        if (this.config.debug && error.name !== "AbortError") {
+        if (error.name !== "AbortError") {
           console.error("TypeMorph: Operation error:", error);
         }
       }
@@ -601,30 +606,6 @@ export class TypeMorph {
         }
       }
     }
-  }
-
-  _deepMerge(target, source) {
-    const output = { ...target };
-
-    if (this._isObject(target) && this._isObject(source)) {
-      Object.keys(source).forEach((key) => {
-        if (this._isObject(source[key])) {
-          if (!(key in target)) {
-            output[key] = source[key];
-          } else {
-            output[key] = this._deepMerge(target[key], source[key]);
-          }
-        } else {
-          output[key] = source[key];
-        }
-      });
-    }
-
-    return output;
-  }
-
-  _isObject(item) {
-    return item && typeof item === "object" && !Array.isArray(item);
   }
 
   _validateOptions() {

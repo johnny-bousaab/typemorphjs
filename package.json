@@ -1,12 +1,15 @@
 {
   "scripts": {
-    "test": "jest"
+    "test": "node --experimental-vm-modules .\\node_modules\\jest\\bin\\jest.js"
   },
-  "jest": {
-    "testEnvironment": "jsdom"
-  },
+  "type": "module",
   "devDependencies": {
     "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
     "jsdom": "^27.1.0"
+  },
+  "dependencies": {
+    "dompurify": "^3.3.0",
+    "marked": "^16.4.1"
   }
 }

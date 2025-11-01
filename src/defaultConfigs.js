@@ -1,5 +1,5 @@
 export const defaultConfigs = {
-  text: "Hello from TypeMorphJS!",
+  text: null,
   parent: null, // HTML element or string
   speed: 50, // ms per character
   chunkSize: 1,
