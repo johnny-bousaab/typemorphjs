@@ -137,7 +137,11 @@ export class TypeMorph {
 
         if (signal.aborted) break;
 
-        if (this._currentlyLooping() && this.config.loopEndDelay) {
+        if (
+          this._currentlyLooping() &&
+          this.config.loopEndDelay &&
+          this._currentLoop < this.loopCount - 1
+        ) {
           await this._delay(this.config.loopEndDelay, signal);
         }
 
@@ -237,7 +241,6 @@ export class TypeMorph {
 
   async _typeNode(parent, node, signal) {
     const children = Array.from(node.childNodes);
-    let cursorReattached = false;
 
     for (let child of children) {
       if (signal.aborted) break;
@@ -260,24 +263,9 @@ export class TypeMorph {
           }
         }
 
-        // const cursorWasHere = this._cursorEl?.parentNode === parent;
-        // if (cursorWasHere && this._cursorEl) {
-        //   this._cursorEl.remove();
-        // }
-
         parent.appendChild(el);
         await this._typeNode(el, child, signal);
-
-        cursorReattached = true;
-
-        // if (cursorWasHere && this._cursorEl) {
-        //   parent.appendChild(this._cursorEl);
-        // }
       }
-    }
-
-    if (cursorReattached && this._cursorEl && !this._cursorEl.parentNode) {
-      parent.appendChild(this._cursorEl);
     }
   }
 
@@ -310,9 +298,7 @@ export class TypeMorph {
         }
       }
 
-      if (i < chars.length - 1) {
-        await this._delay(this.speed, signal);
-      }
+      await this._delay(this.speed, signal);
     }
 
     if (this.config.autoScroll) {
@@ -377,7 +363,7 @@ export class TypeMorph {
         }
       } else if (child.nodeType === Node.ELEMENT_NODE) {
         await this._backspaceContent(child, signal);
-        if (child.innerHTML.trim().length === 0 && child.parentNode) {
+        if (this._isElementEmptyExcludingCursor(child) && child.parentNode) {
           if (this._cursorEl && this._cursorEl.parentNode === parent) {
             this._cursorEl.remove();
           }
@@ -385,13 +371,72 @@ export class TypeMorph {
           child.parentNode.removeChild(child);
 
           if (this._cursorEl) {
-            parent.appendChild(this._cursorEl);
+            this._appendCursorToLastTextNode(this.parent);
           }
         }
       }
     }
 
     this._cleanEmptyTextNodes(parent);
+  }
+
+  _appendCursorToLastTextNode(parent) {
+    const lastTextNode = this._findLastTextNode(parent);
+
+    if (lastTextNode && lastTextNode.parentNode) {
+      lastTextNode.parentNode.appendChild(this._cursorEl);
+    } else {
+      parent.appendChild(this._cursorEl);
+    }
+  }
+
+  _findLastTextNode(element) {
+    if (!element) return null;
+
+    const childNodes = Array.from(element.childNodes);
+
+    for (let i = childNodes.length - 1; i >= 0; i--) {
+      const child = childNodes[i];
+
+      if (this._cursorEl && child === this._cursorEl) {
+        continue;
+      }
+
+      if (child.nodeType === Node.TEXT_NODE) {
+        if (child.textContent && child.textContent.trim().length > 0) {
+          return child;
+        }
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const lastTextInChild = this._findLastTextNode(child);
+        if (lastTextInChild) {
+          return lastTextInChild;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  _isElementEmptyExcludingCursor(element) {
+    const children = Array.from(element.childNodes);
+
+    for (const child of children) {
+      if (this._cursorEl && child === this._cursorEl) {
+        continue;
+      }
+
+      if (child.nodeType === Node.TEXT_NODE) {
+        if (child.textContent && child.textContent.trim().length > 0) {
+          return false;
+        }
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        if (!this._isElementEmptyExcludingCursor(child)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
   }
 
   _cleanEmptyTextNodes(parent) {
@@ -433,9 +478,7 @@ export class TypeMorph {
         scrollCounter = 0;
       }
 
-      if (chunkStart > 0) {
-        await this._delay(this.config.backspaceSpeed, signal);
-      }
+      await this._delay(this.config.backspaceSpeed, signal);
     }
 
     if (
