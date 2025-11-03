@@ -6,7 +6,7 @@ const { marked, DOMPurify } = await loadDeps();
 /**
  * TypeMorph: Core typing animation
  * Handles typing, backspacing, and looping animations
- * Supports Makrdown/HTML parsing
+ * Supports Makrdown/HTML
  */
 export class TypeMorph {
   constructor(config = {}) {
@@ -45,7 +45,7 @@ export class TypeMorph {
   async type(text, parent = null) {
     this._checkLifetime();
     await this._cancelCurrentOperation();
-    return this._enqueueOperation(async (signal) => {
+    return this._startOperation(async (signal) => {
       this._createCursor();
       await this._type(text, parent, { loopSource: false }, signal);
     });
@@ -68,7 +68,7 @@ export class TypeMorph {
   async loop(text = null, parent = null) {
     this._checkLifetime();
     await this._cancelCurrentOperation();
-    return this._enqueueOperation(async (signal) => {
+    return this._startOperation(async (signal) => {
       await this._loop(text, parent, signal);
     });
   }
@@ -501,18 +501,25 @@ export class TypeMorph {
     this.parent =
       typeof parent === "string" ? document.getElementById(parent) : parent;
 
-    if (!this.parent || !this.parent instanceof Element) {
-      if (typeof parent === "string")
+    const isHtmlElement = this.parent instanceof Element;
+
+    if (!this.parent || !isHtmlElement) {
+      if (typeof parent === "string") {
         throw new Error(
           `TypeMorph: Parent element not found for selector #${parent}`
         );
+      } else if (!isHtmlElement) {
+        throw new Error(
+          `TypeMorph: Parent element is not a valid HTML element or element ID`
+        );
+      }
 
       throw new Error("TypeMorph: Parent element not found");
     }
   }
 
   _setText(text) {
-    if (!text || typeof text !== "string") {
+    if (text == null || typeof text !== "string") {
       throw new Error("TypeMorph: Please provide a valid text string");
     }
     this.text = text;
@@ -533,7 +540,6 @@ export class TypeMorph {
 
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
-        console.log("DONEEEEE");
         this._activeTimers.delete(timer);
         resolve();
       }, ms);
@@ -552,15 +558,22 @@ export class TypeMorph {
     });
   }
 
-  async _enqueueOperation(operation) {
-    await this._operationQueue.catch(() => {});
-    this._abortController = new AbortController();
+  async _startOperation(operation) {
+    if (this._abortController) {
+      this._abortController.abort();
+    }
+
+    const controller = new AbortController();
+    this._abortController = controller;
+
     this._operationQueue = (async () => {
       try {
-        await operation(this._abortController.signal);
-      } catch (error) {
-        if (error.name !== "AbortError") {
-          console.error("TypeMorph: Operation error:", error);
+        await operation(controller.signal);
+      } catch (err) {
+        if (err.name !== "AbortError") throw err;
+      } finally {
+        if (this._abortController === controller) {
+          this._abortController = null;
         }
       }
     })();
@@ -587,7 +600,11 @@ export class TypeMorph {
 
     this._clearAllTracked();
 
-    await this._operationQueue.catch(() => {});
+    if (this._operationQueue) {
+      try {
+        await this._operationQueue;
+      } catch {}
+    }
 
     this._isTyping = false;
     this._clearCursor();

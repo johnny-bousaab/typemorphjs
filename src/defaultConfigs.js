@@ -6,8 +6,8 @@ export const defaultConfigs = {
   loop: false,
   loopCount: Infinity,
   loopType: "clear", // "clear" or "backspace"
-  loopStartDelay: 300, // ms to wait before typing again, after backspacing/clearing, in each loop
-  loopEndDelay: 800, // ms to wait after typing, before backspacing/clearing, in each loop
+  loopStartDelay: 300, // ms to wait before typing again, after backspacing/clearing, in each loop (applies after first loop, meaning loop has to be > 1)
+  loopEndDelay: 800, // ms to wait after typing, before backspacing/clearing, in each loop (applies after first loop, meaning loop has to be > 1)
   backspaceSpeed: 50, // speed per character when backspacing. Used when loopType is "backspace"
   showCursor: true,
   cursorChar: "|",
