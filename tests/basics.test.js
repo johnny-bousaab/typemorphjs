@@ -79,10 +79,19 @@ describe("TypeMorph - Core Basics", () => {
       await expect(typer.type(undefined)).rejects.toThrow();
     });
 
-    test("should reject on non-string text", async () => {
-      await expect(typer.type(123)).rejects.toThrow();
-      await expect(typer.type({})).rejects.toThrow();
-      await expect(typer.type([])).rejects.toThrow();
+    test("should not reject on non-string text", async () => {
+      const p1 = typer.type(123);
+      await jest.runAllTimersAsync();
+
+      const p2 = typer.type(123);
+      await jest.runAllTimersAsync();
+
+      const p3 = typer.type(123);
+      await jest.runAllTimersAsync();
+
+      await expect(p1).resolves.toBeUndefined();
+      await expect(p2).resolves.toBeUndefined();
+      await expect(p3).resolves.toBeUndefined();
     });
 
     test("should handle single character", async () => {

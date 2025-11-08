@@ -1,5 +1,5 @@
 import { defaultConfigs } from "./defaultConfigs.js";
-import { loadDeps, injectCursorCSS } from "./helpers.js";
+import { loadDeps, injectCursorCSS, safeCallback } from "./helpers.js";
 
 const { marked, DOMPurify } = await loadDeps();
 
@@ -60,7 +60,7 @@ export class TypeMorph {
   async stop() {
     this._checkLifetime();
     await this._cancelCurrentOperation();
-    await this._safeCallback(this.config.onStop, this);
+    await safeCallback(this.config.onStop, this);
   }
 
   /**
@@ -93,7 +93,7 @@ export class TypeMorph {
 
     this._destroyed = true;
 
-    this._safeCallback(this.config.onDestroy, this);
+    safeCallback(this.config.onDestroy, this);
   }
 
   /**
@@ -345,7 +345,7 @@ export class TypeMorph {
 
   async _onFinish() {
     this._clearCursorIfNeeded();
-    await this._safeCallback(this.config.onFinish, this);
+    await safeCallback(this.config.onFinish, this);
   }
 
   _clearContent() {
@@ -641,21 +641,6 @@ export class TypeMorph {
 
     this._isTyping = false;
     this._clearCursorIfNeeded();
-  }
-
-  async _safeCallback(callback, ...args) {
-    if (typeof callback === "function") {
-      try {
-        const result = callback(...args);
-        if (result instanceof Promise) {
-          await result;
-        }
-      } catch (error) {
-        if (this.config.debug) {
-          console.error("TypeMorph: Callback error:", error);
-        }
-      }
-    }
   }
 
   _parentStillExists() {

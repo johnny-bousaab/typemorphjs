@@ -44,3 +44,16 @@ export function injectCursorCSS() {
   style.textContent = CURSOR_CSS;
   document.head.appendChild(style);
 }
+
+export async function safeCallback(callback, ...args) {
+  if (typeof callback === "function") {
+    try {
+      const result = callback(...args);
+      if (result instanceof Promise) {
+        await result;
+      }
+    } catch (error) {
+      console.warn("TypeMorph: User callback error:", error);
+    }
+  }
+}

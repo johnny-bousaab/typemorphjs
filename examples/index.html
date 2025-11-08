@@ -12,15 +12,6 @@
         overflow-x: hidden;
         overflow-y: scroll;
       }
-      .typemorph-cursor {
-        display: inline-block;
-        animation: blink 1s step-end infinite;
-      }
-      @keyframes blink {
-        50% {
-          opacity: 0;
-        }
-      }
     </style>
   </head>
   <body>
@@ -34,10 +25,13 @@
         parent: document.getElementById("output"),
         parseMarkdown: false,
         parseHtml: false,
-        showCursor: false,
+        showCursor: true,
+        onStop: () => {
+          throw new Error("callback error");
+        },
       });
 
-      typer.type("<b>Bold</b>");
+      typer.loop("<b>Bold</b>");
     </script>
   </body>
 </html>
