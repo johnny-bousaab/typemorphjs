@@ -30,49 +30,14 @@
     <script type="module">
       import { TypeMorph } from "../src/typemorph.js";
 
-      // const demoText = "**Hello**, this is <i>TypeMorphJS</i>!";
-      const demoText = `<nav>
-				  <ul>
-					<li><a href="#nowhere" title="Lorum ipsum dolor sit amet">Lorem</a></li>
-					<li><a href="#nowhere" title="Aliquam tincidunt mauris eu risus">Aliquam</a></li>
-					<li><a href="#nowhere" title="Morbi in sem quis dui placerat ornare">Morbi</a></li>
-					<li><a href="#nowhere" title="Pellentesque fermentum dolor">Pellentesque</a></li>
-				  </ul>
-				</nav>`;
-
-      // window.typer = new TypeMorph({
-      //   parent: document.getElementById("output"),
-      //   text: demoText,
-      //   speed: 100,
-      //   backspaceSpeed: 50,
-      //   parseMarkdown: true,
-      //   markdownInline: true,
-      //   parseHTML: true,
-      //   showCursor: true,
-      //   cursorChar: "|",
-      //   hideCursorOnFinishTyping: true,
-      //   loopType: "backspace",
-      //   loopStartDelay: 1000,
-      //   loopEndDelay: 2000,
-      //   loopCount: 2,
-      //   chunkSize: 1,
-      //   debug: true,
-      //   autoScroll: true,
-      //   onFinish: () => console.log("Typing finished!"),
-      //   onStop: () => console.log("Typing stopped!"),
-      // });
-
       window.typer = new TypeMorph({
         parent: document.getElementById("output"),
-        speed: 10,
-        backspaceSpeed: 10,
-        clearBeforeTyping: true,
-        hideCursorOnFinishTyping: true,
-        loopCount: 2,
-        debug: false,
+        parseMarkdown: false,
+        parseHtml: false,
+        showCursor: false,
       });
 
-      typer.type("Hello world");
+      typer.type("<b>Bold</b>");
     </script>
   </body>
 </html>

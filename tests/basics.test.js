@@ -1,5 +1,6 @@
 import { jest } from "@jest/globals";
-import { TypeMorph } from "../../src/typemorph.js";
+import { TypeMorph } from "../src/typemorph.js";
+import { CURSOR_SELECTOR, assertNoMemoryLeaks } from "./common.js";
 
 const SPEED = 10;
 const BACKSPACING_SPEED = 10;
@@ -32,8 +33,6 @@ describe("TypeMorph - Core Basics", () => {
     jest.useRealTimers();
   });
 
-  // type() TESTS
-
   describe("type()", () => {
     test("should type text into the parent element", async () => {
       const promise = typer.type("Hello World");
@@ -43,6 +42,7 @@ describe("TypeMorph - Core Basics", () => {
 
       expect(parent.textContent).toBe("Hello World");
       expect(typer.isTyping()).toBe(false);
+      assertNoMemoryLeaks(typer);
     });
 
     test("isTyping() should be true during typing operation", async () => {
@@ -211,10 +211,9 @@ describe("TypeMorph - Core Basics", () => {
     });
 
     test("should cancel previous type() when new type() is called", async () => {
-      const promise1 = typer.type("This will be cancelled");
+      typer.type("This will be cancelled");
 
-      jest.advanceTimersByTime(50);
-      await Promise.resolve();
+      await jest.advanceTimersByTimeAsync(50);
 
       const promise2 = typer.type("Final text");
 
@@ -243,8 +242,6 @@ describe("TypeMorph - Core Basics", () => {
     });
   });
 
-  // loop() TESTS
-
   describe("loop()", () => {
     test("should loop text specified number of times", async () => {
       typer = new TypeMorph({
@@ -263,6 +260,7 @@ describe("TypeMorph - Core Basics", () => {
 
       expect(typer.getCurrentLoop()).toBe(2);
       expect(parent.textContent).toBe("Test");
+      assertNoMemoryLeaks(typer);
     });
 
     test("should use loopType: clear correctly", async () => {
@@ -421,10 +419,9 @@ describe("TypeMorph - Core Basics", () => {
 
       typer.loop("Loop text");
 
-      jest.advanceTimersByTime(200);
-      await Promise.resolve();
+      await jest.advanceTimersByTimeAsync(200);
 
-      typer.stop();
+      await typer.stop();
 
       await jest.runAllTimersAsync();
 
@@ -432,314 +429,333 @@ describe("TypeMorph - Core Basics", () => {
     });
   });
 
-  // // stop() TESTS
+  describe("stop()", () => {
+    test("should stop typing operation", async () => {
+      const text = "This is a long text that will be stopped";
+      typer.type(text);
 
-  // describe("stop()", () => {
-  //   test("should stop typing operation", async () => {
-  //     const promise = typer.type("This is a long text that will be stopped");
+      await jest.advanceTimersByTimeAsync(SPEED * 5);
 
-  //     // Advance partway through
-  //     jest.advanceTimersByTime(50);
-  //     await Promise.resolve();
+      await typer.stop();
 
-  //     await typer.stop();
+      await jest.runAllTimersAsync();
 
-  //     await jest.runAllTimersAsync();
+      expect(parent.textContent).not.toBe(text);
+      expect(typer.isTyping()).toBe(false);
+      assertNoMemoryLeaks(typer);
+    });
 
-  //     expect(parent.textContent).not.toBe(
-  //       "This is a long text that will be stopped"
-  //     );
-  //     expect(typer.isTyping()).toBe(false);
-  //   });
+    test("should stop typing immediately after stop() is called", async () => {
+      const text = "This is a long text that will be stopped";
+      typer.type(text);
 
-  //   test("should stop loop operation", async () => {
-  //     typer = new TypeMorph({
-  //       parent,
-  //       speed: 10,
-  //       loopCount: 10,
-  //       loopType: "clear",
-  //       showCursor: false,
-  //     });
+      await jest.advanceTimersByTimeAsync(SPEED * 5);
+      const beforeStop = parent.textContent;
 
-  //     const promise = typer.loop("Loop text");
+      await typer.stop();
 
-  //     jest.advanceTimersByTime(100);
-  //     await Promise.resolve();
+      const afterStop = parent.textContent;
+      expect(afterStop).toBe(beforeStop);
 
-  //     await typer.stop();
+      await jest.runAllTimersAsync();
+      expect(parent.textContent).toBe(afterStop);
 
-  //     await jest.runAllTimersAsync();
+      expect(typer.isTyping()).toBe(false);
+    });
 
-  //     expect(typer.getCurrentLoop()).toBeLessThan(10);
-  //     expect(typer.isTyping()).toBe(false);
-  //   });
+    test("should stop all delays", async () => {
+      jest.spyOn(typer, "_delay");
 
-  //   test("should call onStop callback", async () => {
-  //     const onStop = jest.fn();
-  //     typer = new TypeMorph({
-  //       parent,
-  //       onStop,
-  //       showCursor: false,
-  //     });
+      typer.type("1234567890");
+      await jest.advanceTimersByTimeAsync(SPEED * 3);
 
-  //     typer.type("Test");
+      await typer.stop();
 
-  //     jest.advanceTimersByTime(20);
-  //     await Promise.resolve();
+      const callsAfterStop = typer._delay.mock.calls.length;
+      await jest.advanceTimersByTimeAsync(SPEED * 10);
+      expect(typer._delay.mock.calls.length).toBe(callsAfterStop);
+      assertNoMemoryLeaks(typer);
+    });
 
-  //     await typer.stop();
+    test("should stop loop operation", async () => {
+      typer = new TypeMorph({
+        parent,
+        speed: SPEED,
+        loopCount: 10,
+        loopType: "clear",
+      });
 
-  //     expect(onStop).toHaveBeenCalledTimes(1);
-  //     expect(onStop).toHaveBeenCalledWith(typer);
-  //   });
+      typer.loop("Loop text");
 
-  //   test("should be safe to call multiple times", async () => {
-  //     typer.type("Test");
+      await jest.advanceTimersByTimeAsync(SPEED * 10);
 
-  //     await typer.stop();
-  //     await typer.stop();
-  //     await typer.stop();
+      await typer.stop();
 
-  //     expect(typer.isTyping()).toBe(false);
-  //   });
+      await jest.runAllTimersAsync();
 
-  //   test("should be safe to call when not typing", async () => {
-  //     await expect(typer.stop()).resolves.not.toThrow();
-  //     expect(typer.isTyping()).toBe(false);
-  //   });
+      expect(typer.getCurrentLoop()).toBeLessThan(2);
+      expect(typer.isTyping()).toBe(false);
+      assertNoMemoryLeaks(typer);
+    });
 
-  //   test("should allow new type() after stop()", async () => {
-  //     typer.type("First");
+    test("should call onStop callback", async () => {
+      const onStop = jest.fn();
+      typer = new TypeMorph({
+        parent,
+        onStop,
+        showCursor: false,
+      });
 
-  //     jest.advanceTimersByTime(20);
-  //     await Promise.resolve();
+      typer.type("Test");
 
-  //     await typer.stop();
+      await jest.advanceTimersByTimeAsync(SPEED * 2);
 
-  //     const promise = typer.type("Second");
+      await typer.stop();
 
-  //     await jest.runAllTimersAsync();
-  //     await promise;
+      expect(onStop).toHaveBeenCalledTimes(1);
+      expect(onStop).toHaveBeenCalledWith(typer);
+    });
 
-  //     expect(parent.textContent).toBe("Second");
-  //   });
+    test("should be safe to call multiple times", async () => {
+      typer.type("Test");
 
-  //   test("should throw when called on destroyed instance", async () => {
-  //     typer.destroy();
+      await typer.stop();
+      await typer.stop();
+      await typer.stop();
 
-  //     expect(() => typer.stop()).toThrow(/destroyed instance/);
-  //   });
-  // });
+      expect(typer.isTyping()).toBe(false);
+      assertNoMemoryLeaks(typer);
+    });
 
-  // // destroy() TESTS
+    test("should be safe to call when not typing", async () => {
+      await expect(typer.stop()).resolves.not.toThrow();
+      expect(typer.isTyping()).toBe(false);
+    });
 
-  // describe("destroy()", () => {
-  //   test("should cleanup and mark as destroyed", () => {
-  //     typer.destroy();
+    test("should allow new type() after stop()", async () => {
+      typer.type("First");
 
-  //     expect(typer.isDestroyed()).toBe(true);
-  //   });
+      await jest.advanceTimersByTimeAsync(SPEED * 2);
 
-  //   test("should stop ongoing typing operation", async () => {
-  //     typer.type("Test text");
+      typer.stop();
 
-  //     jest.advanceTimersByTime(20);
-  //     await Promise.resolve();
+      typer.type("Second");
 
-  //     typer.destroy();
+      await jest.runAllTimersAsync();
 
-  //     await jest.runAllTimersAsync();
+      expect(parent.textContent).toBe("Second");
+    });
 
-  //     expect(typer.isTyping()).toBe(false);
-  //     expect(typer.isDestroyed()).toBe(true);
-  //   });
+    test("should throw when called on destroyed instance", async () => {
+      typer.destroy();
+      await expect(() => typer.stop()).rejects.toThrow();
+    });
+  });
 
-  //   test("should remove cursor from DOM", async () => {
-  //     typer = new TypeMorph({
-  //       parent,
-  //       showCursor: true,
-  //     });
+  describe("destroy()", () => {
+    test("should cleanup and mark as destroyed", () => {
+      typer.destroy();
+      expect(typer.isDestroyed()).toBe(true);
+      assertNoMemoryLeaks(typer);
+    });
 
-  //     await typer.type("Test");
-  //     await jest.runAllTimersAsync();
+    test("should stop ongoing typing operation", async () => {
+      typer.type("Test text");
 
-  //     const cursorBefore = parent.querySelector("[data-typemorph-cursor]");
-  //     expect(cursorBefore).toBeTruthy();
+      await jest.advanceTimersByTimeAsync(SPEED * 5);
 
-  //     typer.destroy();
+      typer.destroy();
 
-  //     const cursorAfter = parent.querySelector("[data-typemorph-cursor]");
-  //     expect(cursorAfter).toBeNull();
-  //   });
+      await jest.runAllTimersAsync();
 
-  //   test("should call onDestroy callback", () => {
-  //     const onDestroy = jest.fn();
-  //     typer = new TypeMorph({
-  //       parent,
-  //       onDestroy,
-  //     });
+      expect(typer.isTyping()).toBe(false);
+      expect(typer.isDestroyed()).toBe(true);
+      assertNoMemoryLeaks(typer);
+    });
 
-  //     typer.destroy();
+    test("should remove cursor from DOM", async () => {
+      typer = new TypeMorph({
+        parent,
+        showCursor: true,
+        hideCursorOnFinishTyping: false,
+      });
 
-  //     expect(onDestroy).toHaveBeenCalledTimes(1);
-  //     expect(onDestroy).toHaveBeenCalledWith(typer);
-  //   });
+      const promise = typer.type("Test");
+      await jest.runAllTimersAsync();
 
-  //   test("should be idempotent (safe to call multiple times)", () => {
-  //     const onDestroy = jest.fn();
-  //     typer = new TypeMorph({
-  //       parent,
-  //       onDestroy,
-  //     });
+      await promise;
 
-  //     typer.destroy();
-  //     typer.destroy();
-  //     typer.destroy();
+      const cursorBefore = parent.querySelector(CURSOR_SELECTOR);
+      expect(cursorBefore).toBeTruthy();
 
-  //     expect(onDestroy).toHaveBeenCalledTimes(1);
-  //     expect(typer.isDestroyed()).toBe(true);
-  //   });
+      typer.destroy();
 
-  //   test("should prevent further operations after destroy", () => {
-  //     typer.destroy();
+      const cursorAfter = parent.querySelector(CURSOR_SELECTOR);
+      expect(cursorAfter).toBeNull();
+    });
 
-  //     expect(() => typer.type("Test")).toThrow(/destroyed instance/);
-  //     expect(() => typer.loop("Test")).toThrow(/destroyed instance/);
-  //     expect(() => typer.stop()).toThrow(/destroyed instance/);
-  //   });
+    test("should call onDestroy callback", () => {
+      const onDestroy = jest.fn();
+      typer = new TypeMorph({
+        parent,
+        onDestroy,
+      });
 
-  //   test("should cleanup abort controller", () => {
-  //     typer.type("Test");
+      typer.destroy();
 
-  //     expect(typer._abortController).toBeDefined();
+      expect(onDestroy).toHaveBeenCalledTimes(1);
+      expect(onDestroy).toHaveBeenCalledWith(typer);
+    });
 
-  //     typer.destroy();
+    test("should be idempotent (safe to call multiple times)", () => {
+      const onDestroy = jest.fn();
+      typer = new TypeMorph({
+        parent,
+        onDestroy,
+      });
 
-  //     expect(typer._abortController).toBeNull();
-  //   });
+      typer.destroy();
+      typer.destroy();
+      typer.destroy();
 
-  //   test("should cleanup all active timers", async () => {
-  //     typer.type("Test text");
+      expect(onDestroy).toHaveBeenCalledTimes(1);
+      expect(typer.isDestroyed()).toBe(true);
+    });
 
-  //     jest.advanceTimersByTime(20);
-  //     await Promise.resolve();
+    test("should prevent further operations after destroy", async () => {
+      typer.destroy();
 
-  //     const timersBefore = typer._activeTimers.size;
-  //     expect(timersBefore).toBeGreaterThan(0);
+      await expect(() => typer.type("Test")).rejects.toThrow();
+      await expect(() => typer.loop("Test")).rejects.toThrow();
+      await expect(() => typer.stop()).rejects.toThrow();
+    });
 
-  //     typer.destroy();
+    test("should cleanup abort controller", () => {
+      typer.type("Test");
 
-  //     expect(typer._activeTimers.size).toBe(0);
-  //   });
-  // });
+      expect(typer._abortController).toBeDefined();
 
-  // // STATE INTROSPECTION TESTS
+      typer.destroy();
 
-  // describe("State Methods", () => {
-  //   test("isTyping() should return correct state", async () => {
-  //     expect(typer.isTyping()).toBe(false);
+      expect(typer._abortController).toBeNull();
+    });
 
-  //     const promise = typer.type("Test");
-  //     expect(typer.isTyping()).toBe(true);
+    test("should cleanup all active timers", async () => {
+      typer.type("Test text");
 
-  //     await jest.runAllTimersAsync();
-  //     await promise;
+      await jest.advanceTimersByTimeAsync(SPEED * 2);
 
-  //     expect(typer.isTyping()).toBe(false);
-  //   });
+      const timersBefore = typer._activeTimers.size;
+      expect(timersBefore).toBeGreaterThan(0);
 
-  //   test("isDestroyed() should return correct state", () => {
-  //     expect(typer.isDestroyed()).toBe(false);
+      typer.destroy();
 
-  //     typer.destroy();
+      expect(typer._activeTimers.size).toBe(0);
+    });
+  });
 
-  //     expect(typer.isDestroyed()).toBe(true);
-  //   });
+  describe("State Methods", () => {
+    test("isTyping() should return correct state", async () => {
+      expect(typer.isTyping()).toBe(false);
 
-  //   test("getCurrentLoop() should return correct loop count", async () => {
-  //     typer = new TypeMorph({
-  //       parent,
-  //       speed: 10,
-  //       loopCount: 3,
-  //       loopType: "clear",
-  //       showCursor: false,
-  //     });
+      const promise = typer.type("Test");
 
-  //     expect(typer.getCurrentLoop()).toBe(0);
+      await jest.advanceTimersByTimeAsync(SPEED * 1);
 
-  //     const promise = typer.loop("Test");
+      expect(typer.isTyping()).toBe(true);
 
-  //     await jest.runAllTimersAsync();
-  //     await promise;
+      await jest.runAllTimersAsync();
+      await promise;
 
-  //     expect(typer.getCurrentLoop()).toBe(3);
-  //   });
-  // });
+      expect(typer.isTyping()).toBe(false);
+    });
 
-  // // INTEGRATION TESTS
+    test("isDestroyed() should return correct state", () => {
+      expect(typer.isDestroyed()).toBe(false);
 
-  // describe("Integration Scenarios", () => {
-  //   test("should handle alternating type() and stop() calls", async () => {
-  //     for (let i = 0; i < 5; i++) {
-  //       typer.type(`Text ${i}`);
-  //       jest.advanceTimersByTime(10);
-  //       await Promise.resolve();
-  //       await typer.stop();
-  //     }
+      typer.destroy();
 
-  //     expect(typer.isTyping()).toBe(false);
-  //     expect(() => typer.isDestroyed()).not.toThrow();
-  //   });
+      expect(typer.isDestroyed()).toBe(true);
+    });
 
-  //   test("should handle rapid sequential type() calls", async () => {
-  //     const promises = [];
-  //     for (let i = 0; i < 10; i++) {
-  //       promises.push(typer.type(`Text ${i}`));
-  //     }
+    test("getCurrentLoop() should return correct loop count", async () => {
+      typer = new TypeMorph({
+        parent,
+        loopCount: 3,
+      });
 
-  //     await jest.runAllTimersAsync();
+      expect(typer.getCurrentLoop()).toBe(0);
 
-  //     // Last call should win
-  //     expect(parent.textContent).toBe("Text 9");
-  //   });
+      const promise = typer.loop("Test");
 
-  //   test("should handle type() -> stop() -> type() -> destroy() sequence", async () => {
-  //     typer.type("First");
-  //     jest.advanceTimersByTime(20);
-  //     await Promise.resolve();
+      await jest.runAllTimersAsync();
+      await promise;
 
-  //     await typer.stop();
+      expect(typer.getCurrentLoop()).toBe(3);
+    });
+  });
 
-  //     const promise = typer.type("Second");
-  //     await jest.runAllTimersAsync();
-  //     await promise;
+  describe("Integration Scenarios", () => {
+    test("should handle alternating type() and stop() calls", async () => {
+      for (let i = 0; i < 5; i++) {
+        typer.type(`Text ${i}`);
+        await jest.advanceTimersByTimeAsync(10);
+        await typer.stop();
+      }
 
-  //     expect(parent.textContent).toBe("Second");
+      expect(typer.isTyping()).toBe(false);
+      assertNoMemoryLeaks(typer);
+    });
 
-  //     typer.destroy();
-  //     expect(typer.isDestroyed()).toBe(true);
-  //   });
+    test("should handle rapid sequential type() calls", async () => {
+      const promises = [];
+      for (let i = 0; i < 10; i++) {
+        promises.push(typer.type(`Text ${i}`));
+      }
 
-  //   test("should handle loop() with stop() mid-loop", async () => {
-  //     typer = new TypeMorph({
-  //       parent,
-  //       speed: 10,
-  //       loopCount: 5,
-  //       loopType: "clear",
-  //       showCursor: false,
-  //     });
+      await jest.runAllTimersAsync();
 
-  //     typer.loop("Loop text");
+      expect(parent.textContent).toBe("Text 9");
+      assertNoMemoryLeaks(typer);
+    });
 
-  //     // Let some iterations happen
-  //     jest.advanceTimersByTime(100);
-  //     await Promise.resolve();
+    test("should handle type() -> stop() -> type() -> destroy() sequence", async () => {
+      typer.type("First");
+      await jest.advanceTimersByTimeAsync(20);
 
-  //     await typer.stop();
+      await typer.stop();
 
-  //     const loopCount = typer.getCurrentLoop();
-  //     expect(loopCount).toBeGreaterThan(0);
-  //     expect(loopCount).toBeLessThan(5);
-  //   });
-  // });
+      const promise = typer.type("Second");
+      await jest.runAllTimersAsync();
+      await promise;
+
+      expect(parent.textContent).toBe("Second");
+
+      typer.destroy();
+      expect(typer.isDestroyed()).toBe(true);
+      assertNoMemoryLeaks(typer);
+    });
+
+    test("should handle loop() with stop() mid-loop", async () => {
+      typer = new TypeMorph({
+        parent,
+        speed: SPEED,
+        loopCount: 5,
+        loopType: "clear",
+        loopEndDelay: 1,
+        loopStartDelay: 1,
+        showCursor: false,
+      });
+
+      typer.loop("12345");
+
+      await jest.advanceTimersByTimeAsync(SPEED * 8);
+
+      await typer.stop();
+
+      const loopCount = typer.getCurrentLoop();
+      expect(loopCount).toBe(1); // because it is 0-based index
+      assertNoMemoryLeaks(typer);
+    });
+  });
 });

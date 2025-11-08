@@ -1,12 +1,14 @@
 import { defaultConfigs } from "./defaultConfigs.js";
-import { loadDeps } from "./helpers.js";
+import { loadDeps, injectCursorCSS } from "./helpers.js";
 
 const { marked, DOMPurify } = await loadDeps();
+
+injectCursorCSS();
 
 /**
  * TypeMorph: Core typing animation
  * Handles typing, backspacing, and looping animations
- * Supports Makrdown/HTML
+ * Supports Markdown & HTML
  */
 export class TypeMorph {
   constructor(config = {}) {
@@ -20,6 +22,7 @@ export class TypeMorph {
 
     this.text = this.config.text;
     this.speed = this.config.speed;
+    this.backspaceSpeed = this.config.backspaceSpeed;
     this.cursorChar = this.config.cursorChar;
     this.loopCount = this.config.loopCount;
     this.chunkSize = this.config.chunkSize;
@@ -86,24 +89,33 @@ export class TypeMorph {
       this._abortController = null;
     }
 
-    if (this._cursorEl && this._cursorEl.parentNode) {
-      this._cursorEl.remove();
-    }
+    this._removeCursor();
 
-    this._cursorEl = null;
     this._destroyed = true;
 
     this._safeCallback(this.config.onDestroy, this);
   }
 
+  /**
+   *
+   * @returns {boolean} - Whether the instance is currently typing
+   */
   isTyping() {
     return this._isTyping;
   }
 
+  /**
+   *
+   * @returns {boolean} - Whether the instance is destroyed
+   */
   isDestroyed() {
     return this._destroyed;
   }
 
+  /**
+   *
+   * @returns {number} - Current loop iteration (0-based)
+   */
   getCurrentLoop() {
     return this._currentLoop;
   }
@@ -206,7 +218,7 @@ export class TypeMorph {
         contentToType = result instanceof Promise ? await result : result;
       }
 
-      if (this.config.parseHTML) {
+      if (this.config.parseHtml || this.config.parseMarkdown) {
         await this._typeHTML(contentToType, signal);
       } else {
         await this._typeText(contentToType, this.parent, signal);
@@ -232,11 +244,9 @@ export class TypeMorph {
   }
 
   async _typeHTML(html, signal) {
-    if (!this.config.trustedHTML) {
-      html = this.config.htmlSanitize
-        ? this.config.htmlSanitize(html)
-        : DOMPurify.sanitize(html);
-    }
+    html = this.config.htmlSanitize
+      ? this.config.htmlSanitize(html)
+      : DOMPurify.sanitize(html);
 
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
@@ -247,7 +257,7 @@ export class TypeMorph {
     const children = Array.from(node.childNodes);
 
     for (let child of children) {
-      if (signal.aborted) break;
+      if (signal.aborted || !parent) break;
 
       if (
         child.nodeType === Node.TEXT_NODE &&
@@ -274,7 +284,7 @@ export class TypeMorph {
   }
 
   async _typeText(text, parent = this.parent, signal) {
-    if (!text || signal.aborted) return;
+    if (!text || signal.aborted || !this._parentStillExists()) return;
 
     if (this._cursorEl) {
       if (this._cursorEl.parentNode) {
@@ -288,11 +298,12 @@ export class TypeMorph {
     let scrollCounter = 0;
 
     for (let i = 0; i < chars.length; i++) {
-      if (signal.aborted) break;
+      if (signal.aborted || !this._parentStillExists()) break;
 
       buffer += chars[i];
 
-      if (buffer.length >= this.chunkSize || i === chars.length - 1) {
+      const append = buffer.length >= this.chunkSize || i === chars.length - 1;
+      if (append) {
         this._appendTextToParent(parent, buffer);
         buffer = "";
         scrollCounter++;
@@ -302,7 +313,8 @@ export class TypeMorph {
         }
       }
 
-      await this._delay(this.speed, signal);
+      if (this._parentStillExists() && append)
+        await this._delay(this.speed, signal);
     }
 
     if (this.config.autoScroll) {
@@ -311,6 +323,8 @@ export class TypeMorph {
   }
 
   _appendTextToParent(parent, text) {
+    if (!this._parentStillExists()) return;
+
     if (this._cursorEl) {
       let previousSibling = this._cursorEl.previousSibling;
       if (previousSibling && previousSibling.nodeType === Node.TEXT_NODE) {
@@ -330,7 +344,7 @@ export class TypeMorph {
   }
 
   async _onFinish() {
-    this._clearCursor();
+    this._clearCursorIfNeeded();
     await this._safeCallback(this.config.onFinish, this);
   }
 
@@ -340,21 +354,27 @@ export class TypeMorph {
     if (this._cursorEl) this.parent.appendChild(this._cursorEl);
   }
 
-  _clearCursor() {
-    if (this.config.hideCursorOnFinishTyping && this._cursorEl) {
+  _clearCursorIfNeeded() {
+    if (this.config.hideCursorOnFinishTyping) {
+      this._removeCursor();
+    }
+  }
+
+  _removeCursor() {
+    if (this._cursorEl) {
       this._cursorEl.remove();
       this._cursorEl = null;
     }
   }
 
   async _backspaceContent(parent = this.parent, signal) {
-    if (!parent || signal.aborted) return;
+    if (!parent || signal.aborted || !this._parentStillExists()) return;
 
     const children = Array.from(parent.childNodes);
 
     for (let i = children.length - 1; i >= 0; i--) {
       const child = children[i];
-      if (signal.aborted) return;
+      if (signal.aborted || !this._parentStillExists()) return;
 
       if (this._cursorEl && child === this._cursorEl) {
         continue;
@@ -385,6 +405,8 @@ export class TypeMorph {
   }
 
   _appendCursorToLastTextNode(parent) {
+    if (!this._parentStillExists()) return;
+
     const lastTextNode = this._findLastTextNode(parent);
 
     if (lastTextNode && lastTextNode.parentNode) {
@@ -456,6 +478,8 @@ export class TypeMorph {
   }
 
   async _backspaceTextNode(node, signal) {
+    if (!this._parentStillExists()) return;
+
     if (!node.textContent || node.textContent.trim().length === 0) {
       if (node.parentNode) node.parentNode.removeChild(node);
       return;
@@ -466,7 +490,7 @@ export class TypeMorph {
     let scrollCounter = 0;
 
     for (let i = chars.length - 1; i >= 0; i -= this.chunkSize) {
-      if (signal.aborted) break;
+      if (signal.aborted || !this._parentStillExists()) break;
 
       const chunkStart = Math.max(0, i - this.chunkSize + 1);
       const charsToKeep = chars.slice(0, chunkStart);
@@ -482,17 +506,18 @@ export class TypeMorph {
         scrollCounter = 0;
       }
 
-      await this._delay(this.config.backspaceSpeed, signal);
+      if (this._parentStillExists())
+        await this._delay(this.backspaceSpeed, signal);
     }
 
     if (
-      node.parentNode &&
+      node?.parentNode &&
       (!node.textContent || node.textContent.length === 0)
     ) {
       node.parentNode.removeChild(node);
     }
 
-    if (this.config.autoScroll && node.parentNode) {
+    if (this.config.autoScroll && node?.parentNode) {
       node.parentNode.scrollIntoView({ behavior: "smooth", block: "end" });
     }
   }
@@ -519,14 +544,22 @@ export class TypeMorph {
   }
 
   _setText(text) {
-    if (text == null || typeof text !== "string") {
-      throw new Error("TypeMorph: Please provide a valid text string");
+    if (text == null) {
+      throw new Error("[TypeMorph] Please provide a valid text");
     }
+
+    if (typeof text !== "string") {
+      console.warn(
+        `[TypeMorph] Non-string input (${typeof text}) auto-converted to string.`
+      );
+      text = String(text);
+    }
+
     this.text = text;
   }
 
   _currentlyLooping() {
-    return this._isTyping;
+    return this._isTyping && this._parentStillExists();
   }
 
   _checkLifetime() {
@@ -607,7 +640,7 @@ export class TypeMorph {
     }
 
     this._isTyping = false;
-    this._clearCursor();
+    this._clearCursorIfNeeded();
   }
 
   async _safeCallback(callback, ...args) {
@@ -625,6 +658,10 @@ export class TypeMorph {
     }
   }
 
+  _parentStillExists() {
+    return this.parent && this.parent.isConnected;
+  }
+
   _validateOptions() {
     if (typeof this.chunkSize != "number" || this.chunkSize < 1)
       throw new Error("TypeMorph: chunkSize has to be a number > 0");
@@ -634,5 +671,8 @@ export class TypeMorph {
 
     if (typeof this.speed != "number" || this.speed < 0)
       throw new Error("TypeMorph: speed has to be a number >= 0");
+
+    if (typeof this.backspaceSpeed != "number" || this.backspaceSpeed < 0)
+      throw new Error("TypeMorph: backspaceSpeed has to be a number >= 0");
   }
 }

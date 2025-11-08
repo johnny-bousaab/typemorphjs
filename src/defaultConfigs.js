@@ -11,16 +11,15 @@ export const defaultConfigs = {
   backspaceSpeed: 50, // speed per character when backspacing. Used when loopType is "backspace"
   showCursor: true,
   cursorChar: "|",
-  parseMarkdown: false,
+  parseMarkdown: false, // if true, will parse makrdown syntax to HTML, meaning parseHtml is implied
   markdownInline: false, // whether to parse markdown inline, can be helpful to avoid unwanted wrappers for simple text
-  parseHTML: true,
+  parseHtml: true,
   markdownParse: null, // custom markdown parse function -> markdownParse(text, inline = false)
   hideCursorOnFinishTyping: true,
   autoScroll: true,
   scrollInterval: 1, // characters typed before scroll is triggered when typing
   clearBeforeTyping: true, // if type() was used on same parent, whether to clear text content before typing again
   debug: false,
-  trustedHTML: false, // if true, html is not sanitized
   htmlSanitize: null, // custom html sanitize function -> htmlSanitize(html)
   onStop: (instance) => {}, // typing has been stopped callback
   onFinish: (instance) => {}, // typing naturally finished callback
