@@ -35,7 +35,6 @@ export class TypeMorph {
     this._isTyping = false;
     this._operationQueue = Promise.resolve();
     this._activeTimers = new Set();
-    this._activeIntervals = new Set();
 
     this._validateOptions();
   }
@@ -244,9 +243,11 @@ export class TypeMorph {
   }
 
   async _typeHTML(html, signal) {
-    html = this.config.htmlSanitize
+    const result = this.config.htmlSanitize
       ? this.config.htmlSanitize(html)
       : DOMPurify.sanitize(html);
+
+    html = result instanceof Promise ? await result : result;
 
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
@@ -257,7 +258,7 @@ export class TypeMorph {
     const children = Array.from(node.childNodes);
 
     for (let child of children) {
-      if (signal.aborted || !parent) break;
+      if (signal.aborted || !this._parentStillExists()) break;
 
       if (
         child.nodeType === Node.TEXT_NODE &&
@@ -271,9 +272,7 @@ export class TypeMorph {
           try {
             el.setAttribute(attr.name, attr.value);
           } catch (e) {
-            if (this.config.debug) {
-              console.warn("TypeMorph: Failed to set attribute", attr.name, e);
-            }
+            console.warn("TypeMorph: Failed to set attribute", attr.name, e);
           }
         }
 
@@ -367,8 +366,8 @@ export class TypeMorph {
     }
   }
 
-  async _backspaceContent(parent = this.parent, signal) {
-    if (!parent || signal.aborted || !this._parentStillExists()) return;
+  async _backspaceContent(parent, signal) {
+    if (signal.aborted || !this._parentStillExists()) return;
 
     const children = Array.from(parent.childNodes);
 
@@ -511,13 +510,18 @@ export class TypeMorph {
     }
 
     if (
-      node?.parentNode &&
+      this._parentStillExists() &&
+      node.parentNode &&
       (!node.textContent || node.textContent.length === 0)
     ) {
       node.parentNode.removeChild(node);
     }
 
-    if (this.config.autoScroll && node?.parentNode) {
+    if (
+      this.config.autoScroll &&
+      this._parentStillExists() &&
+      node.parentNode
+    ) {
       node.parentNode.scrollIntoView({ behavior: "smooth", block: "end" });
     }
   }
@@ -533,13 +537,11 @@ export class TypeMorph {
         throw new Error(
           `TypeMorph: Parent element not found for selector #${parent}`
         );
-      } else if (!isHtmlElement) {
+      } else {
         throw new Error(
           `TypeMorph: Parent element is not a valid HTML element or element ID`
         );
       }
-
-      throw new Error("TypeMorph: Parent element not found");
     }
   }
 
@@ -619,11 +621,6 @@ export class TypeMorph {
       clearTimeout(timer);
     }
     this._activeTimers.clear();
-
-    for (const interval of this._activeIntervals) {
-      clearInterval(interval);
-    }
-    this._activeIntervals.clear();
   }
 
   async _cancelCurrentOperation() {

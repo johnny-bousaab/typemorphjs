@@ -1,6 +1,5 @@
 import { expect, jest } from "@jest/globals";
-import { TypeMorph } from "../src/typemorph.js";
-import { assertNoMemoryLeaks } from "./common.js";
+import { TypeMorph } from "../../src/typemorph.js";
 
 describe("TypeMorph - ChunkSize", () => {
   let parent;

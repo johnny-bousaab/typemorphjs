@@ -1,6 +1,6 @@
 import { expect, jest } from "@jest/globals";
-import { TypeMorph } from "../src/typemorph.js";
-import { assertNoMemoryLeaks } from "./common.js";
+import { TypeMorph } from "../../src/typemorph.js";
+import { assertNoMemoryLeaks, createPerformanceMonitor } from "../common.js";
 
 const SPEED = 10;
 
@@ -374,5 +374,212 @@ describe("TypeMorph - Memory Leaks & Performance", () => {
       expect(typer.isDestroyed()).toBe(true);
       assertNoMemoryLeaks(typer);
     });
+  });
+
+  describe("Memory Growth", () => {
+    test("should not leak memory during create/destroy cycles", async () => {
+      if (!global.gc) {
+        console.warn("Skipping memory test - run with --expose-gc flag");
+        return;
+      }
+
+      const monitor = createPerformanceMonitor();
+      const observer = monitor.startMonitoring();
+
+      monitor.takeMemorySnapshot();
+
+      for (let i = 0; i < 50; i++) {
+        const typer = new TypeMorph({
+          parent,
+          speed: 5,
+          showCursor: false,
+        });
+
+        typer.type(`Iteration ${i}`);
+        await jest.runAllTimersAsync();
+
+        typer.destroy();
+
+        if (i % 10 === 0 && i > 0) {
+          monitor.takeMemorySnapshot();
+        }
+      }
+
+      monitor.takeMemorySnapshot();
+
+      observer.disconnect();
+
+      const metrics = monitor.getMetrics();
+      console.log(`Total DOM updates: ${metrics.domUpdates}`);
+
+      monitor.assertNoMemoryGrowth(0.2);
+    }, 30000);
+
+    test("should not leak memory during rapid type() calls", async () => {
+      if (!global.gc) {
+        console.warn("Skipping memory test - run with --expose-gc flag");
+        return;
+      }
+
+      const monitor = createPerformanceMonitor();
+      monitor.takeMemorySnapshot();
+
+      const typer = new TypeMorph({
+        parent,
+        speed: 1,
+        showCursor: false,
+      });
+
+      for (let i = 0; i < 100; i++) {
+        typer.type(`Text ${i}`);
+
+        if (i % 20 === 0 && i > 0) {
+          monitor.takeMemorySnapshot();
+        }
+      }
+
+      await jest.runAllTimersAsync();
+
+      monitor.takeMemorySnapshot();
+
+      typer.destroy();
+
+      monitor.assertNoMemoryGrowth(0.2);
+    }, 30000);
+
+    test("should not leak memory during loop operations", async () => {
+      if (!global.gc) {
+        console.warn("Skipping memory test - run with --expose-gc flag");
+        return;
+      }
+
+      const monitor = createPerformanceMonitor();
+      monitor.takeMemorySnapshot();
+
+      for (let i = 0; i < 20; i++) {
+        const typer = new TypeMorph({
+          parent,
+          speed: 1,
+          loopCount: 3,
+          loopType: "backspace",
+          showCursor: false,
+        });
+
+        typer.loop("Test");
+        await jest.runAllTimersAsync();
+
+        typer.destroy();
+
+        if (i % 5 === 0 && i > 0) {
+          monitor.takeMemorySnapshot();
+        }
+      }
+
+      monitor.takeMemorySnapshot();
+
+      monitor.assertNoMemoryGrowth(0.2);
+    }, 30000);
+
+    test("should not accumulate DOM nodes over time", async () => {
+      const monitor = createPerformanceMonitor();
+      const observer = monitor.startMonitoring();
+
+      const typer = new TypeMorph({
+        parent,
+        speed: 5,
+        showCursor: true,
+        hideCursorOnFinishTyping: true,
+        clearBeforeTyping: true,
+      });
+
+      const initialNodeCount = parent.childNodes.length;
+
+      for (let i = 0; i < 30; i++) {
+        typer.type(`Text ${i}`);
+        await jest.runAllTimersAsync();
+      }
+
+      const finalNodeCount = parent.childNodes.length;
+
+      observer.disconnect();
+
+      expect(finalNodeCount).toBeLessThanOrEqual(initialNodeCount + 1);
+
+      typer.destroy();
+    }, 30000);
+
+    test("should limit DOM mutations with chunking", async () => {
+      const monitor = createPerformanceMonitor();
+      const observer = monitor.startMonitoring();
+
+      const typer = new TypeMorph({
+        parent,
+        speed: 5,
+        chunkSize: 10,
+        showCursor: false,
+      });
+
+      const text = "A".repeat(50);
+      typer.type(text);
+      await jest.runAllTimersAsync();
+
+      observer.disconnect();
+
+      const metrics = monitor.getMetrics();
+
+      expect(metrics.domUpdates).toBe(5);
+
+      typer.destroy();
+    });
+
+    test("should handle memory pressure during concurrent operations", async () => {
+      if (!global.gc) {
+        console.warn("Skipping memory test - run with --expose-gc flag");
+        return;
+      }
+
+      const monitor = createPerformanceMonitor();
+      monitor.takeMemorySnapshot();
+
+      const typers = [];
+
+      for (let i = 0; i < 10; i++) {
+        const div = document.createElement("div");
+        document.body.appendChild(div);
+
+        typers.push(
+          new TypeMorph({
+            parent: div,
+            speed: 5,
+            showCursor: false,
+          })
+        );
+      }
+
+      monitor.takeMemorySnapshot();
+
+      const promises = typers.map((typer, i) =>
+        typer.type(`Instance ${i} text`)
+      );
+
+      await jest.runAllTimersAsync();
+
+      monitor.takeMemorySnapshot();
+
+      typers.forEach((t) => t.destroy());
+
+      document.querySelectorAll("div").forEach((d) => {
+        if (d.id !== "target") d.remove();
+      });
+
+      monitor.takeMemorySnapshot();
+
+      const snapshots = monitor.getMetrics().memorySnapshots;
+      const initialMem = snapshots[0].heapUsed;
+      const finalMem = snapshots[snapshots.length - 1].heapUsed;
+      const growth = (finalMem - initialMem) / initialMem;
+
+      expect(growth).toBeLessThan(0.2);
+    }, 30000);
   });
 });

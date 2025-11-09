@@ -1,6 +1,6 @@
 import { expect, jest } from "@jest/globals";
-import { TypeMorph } from "../src/typemorph.js";
-import { assertNoMemoryLeaks } from "./common.js";
+import { TypeMorph } from "../../src/typemorph.js";
+import { assertNoMemoryLeaks } from "../common.js";
 
 describe("TypeMorph - Input Validation", () => {
   let parent;
@@ -56,6 +56,12 @@ describe("TypeMorph - Input Validation", () => {
       expect(() => {
         new TypeMorph({ parent, speed: -1 });
       }).toThrow(/speed/);
+    });
+
+    test("should throw when backspaceSpeed is negative", () => {
+      expect(() => {
+        new TypeMorph({ parent, backspaceSpeed: -1 });
+      }).toThrow(/backspaceSpeed/);
     });
 
     test("should throw when speed is not a number", () => {

@@ -1,5 +1,5 @@
 import { expect, jest } from "@jest/globals";
-import { TypeMorph } from "../src/typemorph.js";
+import { TypeMorph } from "../../src/typemorph.js";
 
 describe("TypeMorph - Markdown", () => {
   let parent;
@@ -92,6 +92,34 @@ describe("TypeMorph - Markdown", () => {
   test("should use custom markdownParse function if provided", async () => {
     const customParser = jest.fn((input) => {
       return `<span class="custom">${input.toUpperCase()}</span>`;
+    });
+
+    const markdownInline = false;
+    typer = new TypeMorph({
+      parent,
+      parseMarkdown: true,
+      markdownInline,
+      markdownParse: customParser,
+      showCursor: false,
+      speed: 5,
+    });
+
+    const text = "custom test";
+    typer.type(text);
+
+    await jest.runAllTimersAsync();
+
+    expect(customParser).toHaveBeenCalledWith(text, markdownInline);
+    expect(parent.innerHTML).toMatch(
+      /<span class="custom">CUSTOM TEST<\/span>/
+    );
+  });
+
+  test("should use custom markdownParse properly if parse() method returns a Promise", async () => {
+    const customParser = jest.fn((input) => {
+      return Promise.resolve(
+        `<span class="custom">${input.toUpperCase()}</span>`
+      );
     });
 
     const markdownInline = false;

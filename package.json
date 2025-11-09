@@ -1,6 +1,9 @@
 {
   "scripts": {
-    "test": "node --experimental-vm-modules .\\node_modules\\jest\\bin\\jest.js"
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
+    "test:memory": "node --expose-gc --experimental-vm-modules ./node_modules/jest/bin/jest.js",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "test:coverage:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --watch"
   },
   "type": "module",
   "devDependencies": {

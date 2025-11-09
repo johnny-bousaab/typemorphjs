@@ -1,5 +1,5 @@
 import { expect, jest } from "@jest/globals";
-import { TypeMorph } from "../src/typemorph.js";
+import { TypeMorph } from "../../src/typemorph.js";
 
 describe("TypeMorph - HTML", () => {
   let parent;
@@ -113,6 +113,29 @@ describe("TypeMorph - HTML", () => {
     const sanitizerMock = jest
       .fn()
       .mockImplementation((html) => html.replace(/<i>.*<\/i>/, ""));
+
+    typer = new TypeMorph({
+      parent,
+      parseHtml: true,
+      showCursor: false,
+      htmlSanitize: sanitizerMock,
+    });
+
+    const text = "<b>Bold</b><i>RemoveMe</i>";
+    typer.type(text);
+    await jest.runAllTimersAsync();
+
+    expect(sanitizerMock).toHaveBeenCalled();
+    expect(parent.innerHTML).toContain("<b>Bold</b>");
+    expect(parent.innerHTML).not.toContain("RemoveMe");
+  });
+
+  test("should use custom sanitizer when sanitize() returns a Promise", async () => {
+    const sanitizerMock = jest
+      .fn()
+      .mockImplementation((html) =>
+        Promise.resolve(html.replace(/<i>.*<\/i>/, ""))
+      );
 
     typer = new TypeMorph({
       parent,
