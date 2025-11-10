@@ -249,6 +249,16 @@ describe("TypeMorph - Core Basics", () => {
 
       await expect(() => typer.type("Test")).rejects.toThrow();
     });
+
+    test("should type normally when initialized with no configs", async () => {
+      typer = new TypeMorph();
+
+      typer.type("Hello World", parent);
+      await jest.runAllTimersAsync();
+
+      expect(parent.textContent).toBe("Hello World");
+      expect(typer.isTyping()).toBe(false);
+    });
   });
 
   describe("loop()", () => {
@@ -435,6 +445,20 @@ describe("TypeMorph - Core Basics", () => {
       await jest.runAllTimersAsync();
 
       expect(typer.getCurrentLoop()).toBeLessThan(10);
+    });
+
+    test("should loop initial text if text was no provided as param", async () => {
+      typer = new TypeMorph({
+        parent,
+        loopCount: 2,
+        text: "Test",
+      });
+
+      typer.loop();
+      await jest.runAllTimersAsync();
+
+      expect(typer.getCurrentLoop()).toBe(2);
+      expect(parent.textContent).toBe("Test");
     });
   });
 

@@ -194,6 +194,28 @@ describe("TypeMorph - Input Validation", () => {
       assertNoMemoryLeaks(typer);
     });
 
+    test("should handle parent being removed from DOM during backspacing", async () => {
+      typer = new TypeMorph({
+        parent,
+        speed: 10,
+        backspaceSpeed: 10,
+        showCursor: false,
+        loopStartDelay: 0,
+        loopEndDelay: 0,
+        loopType: "backspace",
+      });
+
+      const promise = typer.loop("12345");
+
+      await jest.advanceTimersByTimeAsync(7);
+      parent.remove();
+      await jest.runAllTimersAsync();
+
+      await expect(promise).resolves.toBeUndefined();
+      expect(typer.isTyping()).toBe(false);
+      assertNoMemoryLeaks(typer);
+    });
+
     test("should throw when typing to invalid parent selector", async () => {
       const otherParent = document.createElement("div");
       otherParent.id = "valid-parent";

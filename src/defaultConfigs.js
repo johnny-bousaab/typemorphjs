@@ -19,7 +19,6 @@ export const defaultConfigs = {
   autoScroll: true,
   scrollInterval: 1, // characters typed before scroll is triggered when typing
   clearBeforeTyping: true, // if type() was used on same parent, whether to clear text content before typing again
-  debug: false,
   htmlSanitize: null, // custom html sanitize function -> htmlSanitize(html)
   onStop: (instance) => {}, // typing has been stopped callback
   onFinish: (instance) => {}, // typing naturally finished callback
