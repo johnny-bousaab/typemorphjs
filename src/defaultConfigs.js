@@ -3,9 +3,9 @@ export const defaultConfigs = {
   parent: null, // HTML element or string
   speed: 50, // ms per character
   chunkSize: 1,
-  loop: false,
   loopCount: Infinity,
   loopType: "clear", // "clear" or "backspace"
+  loopFinalBehavior: "keep", // "keep" or "remove" -> removing type depends on loopType
   loopStartDelay: 300, // ms to wait before typing again, after backspacing/clearing, in each loop (applies after first loop, meaning loop has to be > 1)
   loopEndDelay: 800, // ms to wait after typing, before backspacing/clearing, in each loop (applies after first loop, meaning loop has to be > 1)
   backspaceSpeed: 50, // speed per character when backspacing. Used when loopType is "backspace"

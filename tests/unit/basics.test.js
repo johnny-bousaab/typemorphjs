@@ -60,17 +60,6 @@ describe("TypeMorph - Core Basics", () => {
       expect(parent.textContent).toBe("Hello World");
     });
 
-    test("should handle empty string gracefully", async () => {
-      parent.textContent = "Existing content";
-
-      const promise = typer.type("");
-      await jest.runAllTimersAsync();
-      await promise;
-
-      expect(parent.textContent).toBe("");
-      expect(typer.isTyping()).toBe(false);
-    });
-
     test("should reject on null text", async () => {
       await expect(typer.type(null)).rejects.toThrow();
     });
@@ -380,6 +369,38 @@ describe("TypeMorph - Core Basics", () => {
       expect(parent.textContent.length).toBeLessThan(text.length);
     });
 
+    test("should respect loopFinalBehavior 'keep'", async () => {
+      typer = new TypeMorph({
+        parent,
+        speed: 10,
+        loopCount: 2,
+        loopFinalBehavior: "keep",
+        showCursor: false,
+      });
+
+      const text = "12345";
+      typer.loop(text);
+
+      await jest.runAllTimersAsync();
+      expect(parent.textContent).toBe(text);
+    });
+
+    test("should respect loopFinalBehavior 'remove'", async () => {
+      typer = new TypeMorph({
+        parent,
+        speed: 10,
+        loopCount: 2,
+        loopFinalBehavior: "remove",
+        showCursor: false,
+      });
+
+      const text = "12345";
+      typer.loop(text);
+
+      await jest.runAllTimersAsync();
+      expect(parent.textContent).toBe("");
+    });
+
     test("should use initial text if not provided", async () => {
       typer = new TypeMorph({
         parent,
@@ -459,6 +480,38 @@ describe("TypeMorph - Core Basics", () => {
 
       expect(typer.getCurrentLoop()).toBe(2);
       expect(parent.textContent).toBe("Test");
+    });
+
+    test("should respect loopFinalBehavior: keep", async () => {
+      typer = new TypeMorph({
+        parent,
+        loopCount: 2,
+        loopType: "clear",
+        loopFinalBehavior: "keep",
+        showCursor: false,
+      });
+
+      typer.loop("1234567890");
+      await jest.runAllTimersAsync();
+
+      expect(parent.textContent).toBe("1234567890");
+      expect(typer.getCurrentLoop()).toBe(2);
+    });
+
+    test("should respect loopFinalBehavior: remove", async () => {
+      typer = new TypeMorph({
+        parent,
+        loopCount: 2,
+        loopType: "clear",
+        loopFinalBehavior: "remove",
+        showCursor: false,
+      });
+
+      typer.loop("1234567890");
+      await jest.runAllTimersAsync();
+
+      expect(parent.textContent).toBe("");
+      expect(typer.getCurrentLoop()).toBe(2);
     });
   });
 

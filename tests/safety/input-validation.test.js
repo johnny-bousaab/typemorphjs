@@ -70,6 +70,13 @@ describe("TypeMorph - Input Validation", () => {
       }).toThrow(/speed/);
     });
 
+    test("should throw when speed is not a number (temp config)", async () => {
+      const typer = new TypeMorph({ parent });
+      await expect(typer.type("hi", { speed: "fast" })).rejects.toThrow(
+        /speed/
+      );
+    });
+
     test("should accept speed of 0", () => {
       expect(() => {
         const typer = new TypeMorph({ parent, speed: 0 });
@@ -93,6 +100,13 @@ describe("TypeMorph - Input Validation", () => {
       expect(() => {
         new TypeMorph({ parent, loopCount: -1 });
       }).toThrow(/loopCount/);
+    });
+
+    test("should throw when loopCount is negative (temp config)", async () => {
+      const typer = new TypeMorph({ parent });
+      await expect(typer.loop("hi", { loopCount: -1 })).rejects.toThrow(
+        /loopCount/
+      );
     });
 
     test("should throw when loopCount is not a number", () => {

@@ -19,12 +19,11 @@ export class TypeMorph {
     this.config = { ...defaultConfigs, ...config };
 
     if (this.config.parent) this._setParent(this.config.parent);
+    if (this.config.text) this._setText(this.config.text);
 
-    this.text = this.config.text;
     this.speed = this.config.speed;
     this.backspaceSpeed = this.config.backspaceSpeed;
     this.cursorChar = this.config.cursorChar;
-    this.loopCount = this.config.loopCount;
     this.chunkSize = this.config.chunkSize;
     this.scrollInterval = this.config.scrollInterval;
 
@@ -36,20 +35,28 @@ export class TypeMorph {
     this._operationQueue = Promise.resolve();
     this._activeTimers = new Set();
 
-    this._validateOptions();
+    this._validateOptions(this.config);
   }
 
   /**
    * Type text character by character
    * @param {string} text - Text to type
    * @param {HTMLElement|string} parent - Parent element or selector
+   * @param {object} options - Additional options to override instance config for current operation
    */
-  async type(text, parent = null) {
+  async type(text, parent = null, options = {}) {
     this._checkLifetime();
-    await this._cancelCurrentOperation();
+    const { _parent, _options } = this._readOptions(parent, options);
+    this._validateOptions(_options);
+    await this._cancelCurrentOperation(_options);
     return this._startOperation(async (signal) => {
-      this._createCursor();
-      await this._type(text, parent, { loopSource: false }, signal);
+      this._createCursor(_options);
+      await this._type(
+        text,
+        _parent,
+        { ..._options, loopSource: false },
+        signal
+      );
     });
   }
 
@@ -66,12 +73,15 @@ export class TypeMorph {
    * Loop typing animation
    * @param {string} text - Text to type in loop
    * @param {HTMLElement|string} parent - Parent element or selector
+   * @param {object} options - Additional options to override instance config for current operation
    */
-  async loop(text = null, parent = null) {
+  async loop(text = null, parent = null, options = {}) {
     this._checkLifetime();
-    await this._cancelCurrentOperation();
+    const { _parent, _options } = this._readOptions(parent, options);
+    this._validateOptions(_options);
+    await this._cancelCurrentOperation(_options);
     return this._startOperation(async (signal) => {
-      await this._loop(text, parent, signal);
+      await this._loop(text, _parent, signal, _options);
     });
   }
 
@@ -82,11 +92,8 @@ export class TypeMorph {
     if (this._destroyed) return;
 
     this.stop();
-
     this._abortController = null;
-
     this._removeCursor();
-
     this._destroyed = true;
 
     safeCallback(this.config.onDestroy, this);
@@ -116,57 +123,77 @@ export class TypeMorph {
     return this._currentLoop;
   }
 
-  async _loop(text, parent, signal) {
-    this._createCursor();
+  async _loop(text, parent, signal, options) {
+    this._createCursor(options);
     this._currentLoop = 0;
     this._isTyping = true;
 
-    this._setParent(parent ?? this.parent);
-    this._setText(text ?? this.text);
+    const targetParent = this._resolveParent(parent);
+    const targetText = this._resolveText(text);
 
-    if (this.config.clearBeforeTyping) {
-      this._clearContent();
+    const clearBeforeTyping =
+      options?.clearBeforeTyping ?? this.config.clearBeforeTyping;
+    const loopStartDelay =
+      options?.loopStartDelay ?? this.config.loopStartDelay;
+    const loopEndDelay = options?.loopEndDelay ?? this.config.loopEndDelay;
+    const loopType = options?.loopType ?? this.config.loopType;
+    const loopCount = options?.loopCount ?? this.config.loopCount;
+    const loopFinalBehavior =
+      options?.loopFinalBehavior ?? this.config.loopFinalBehavior;
+
+    if (clearBeforeTyping) {
+      this._clearContent(targetParent);
     }
 
     try {
       do {
         if (signal.aborted) break;
 
+        const willStillBeLooping =
+          this._currentlyLooping(targetParent) &&
+          this._currentLoop < loopCount - 1;
+        const isFinalLoop =
+          this._currentlyLooping(targetParent) &&
+          this._currentLoop + 1 >= loopCount;
+
         if (
-          this._currentlyLooping() &&
+          this._currentlyLooping(targetParent) &&
           this._currentLoop > 0 &&
-          this.config.loopStartDelay
+          loopStartDelay
         ) {
-          await this._delay(this.config.loopStartDelay, signal);
+          await this._delay(loopStartDelay, signal);
         }
 
-        await this._type(this.text, null, { loopSource: true }, signal);
+        await this._type(
+          targetText,
+          targetParent,
+          { ...options, loopSource: true },
+          signal
+        );
 
         if (signal.aborted) break;
 
-        if (
-          this._currentlyLooping() &&
-          this.config.loopEndDelay &&
-          this._currentLoop < this.loopCount - 1
-        ) {
-          await this._delay(this.config.loopEndDelay, signal);
+        const willClear =
+          this._currentlyLooping(targetParent) &&
+          (willStillBeLooping ||
+            (isFinalLoop && loopFinalBehavior === "remove"));
+
+        if (willClear && loopEndDelay) {
+          await this._delay(loopEndDelay, signal);
         }
 
-        if (
-          this._currentlyLooping() &&
-          this._currentLoop + 1 < this.loopCount
-        ) {
-          if (this.config.loopType === "clear") {
-            this._clearContent();
+        if (willClear) {
+          if (loopType === "clear") {
+            this._clearContent(targetParent);
           } else {
-            await this._backspaceContent(this.parent, signal);
+            await this._backspaceContent(targetParent, targetParent, signal);
           }
         }
 
         this._currentLoop++;
       } while (
-        this._currentlyLooping() &&
-        this._currentLoop < this.loopCount &&
+        this._currentlyLooping(targetParent) &&
+        this._currentLoop < loopCount &&
         !signal.aborted
       );
 
@@ -179,81 +206,94 @@ export class TypeMorph {
   }
 
   async _type(text, parent, options, signal) {
-    this._setParent(parent ?? this.parent);
-    this._setText(text);
+    const targetParent = this._resolveParent(parent);
+    const targetText = this._resolveText(text);
+
     this._isTyping = true;
 
-    if (
-      this.config.clearBeforeTyping &&
-      !options.loopSource &&
-      !signal.aborted
-    ) {
-      this._clearContent();
+    const parseMarkdown = options?.parseMarkdown ?? this.config.parseMarkdown;
+    const parseHtml = options?.parseHtml ?? this.config.parseHtml;
+    const clearBeforeTyping =
+      options?.clearBeforeTyping ?? this.config.clearBeforeTyping;
+    const markdownInline =
+      options?.markdownInline ?? this.config.markdownInline;
+    const markdownParse = options?.markdownParse ?? this.config.markdownParse;
+
+    if (clearBeforeTyping && !options?.loopSource && !signal.aborted) {
+      this._clearContent(targetParent);
     }
 
     try {
-      let contentToType = this.text;
+      let contentToType = targetText;
 
-      if (this.config.parseMarkdown) {
-        const parseMethod = this.config.markdownInline
-          ? "parseInline"
-          : "parse";
+      if (parseMarkdown) {
+        const parseMethod = markdownInline ? "parseInline" : "parse";
 
-        const result = this.config.markdownParse
-          ? this.config.markdownParse(contentToType, this.config.markdownInline)
+        const result = markdownParse
+          ? markdownParse(contentToType, markdownInline)
           : marked[parseMethod](contentToType);
 
         contentToType = result instanceof Promise ? await result : result;
       }
 
-      if (this.config.parseHtml || this.config.parseMarkdown) {
-        await this._typeHTML(contentToType, signal);
+      if (parseHtml || parseMarkdown) {
+        await this._typeHTML(contentToType, targetParent, signal, options);
       } else {
-        await this._typeText(contentToType, this.parent, signal);
+        await this._typeText(contentToType, targetParent, signal, options);
       }
 
-      if (!options.loopSource && !signal.aborted) {
-        await this._onFinish();
+      if (!options?.loopSource && !signal.aborted) {
+        await this._onFinish(options);
       }
     } finally {
-      if (!options.loopSource) {
+      if (!options?.loopSource) {
         this._isTyping = false;
       }
     }
   }
 
-  _createCursor() {
-    if (!this.config.showCursor || this._cursorEl) return;
+  _createCursor(options = {}) {
+    const showCursor = options?.showCursor ?? this.config.showCursor;
+    const cursorChar = options?.cursorChar ?? this.cursorChar;
+
+    if (!showCursor) {
+      this._removeCursor();
+      return;
+    }
+
+    if (this._cursorEl) {
+      this._cursorEl.textContent = cursorChar;
+      return;
+    }
 
     this._cursorEl = document.createElement("span");
-    this._cursorEl.textContent = this.cursorChar;
+    this._cursorEl.textContent = cursorChar;
     this._cursorEl.className = "typemorph-cursor";
     this._cursorEl.setAttribute("data-typemorph-cursor", "true");
   }
 
-  async _typeHTML(html, signal) {
-    const result = this.config.htmlSanitize
-      ? this.config.htmlSanitize(html)
-      : DOMPurify.sanitize(html);
+  async _typeHTML(html, parent, signal, options) {
+    const htmlSanitize = options?.htmlSanitize ?? this.config.htmlSanitize;
+    const result = htmlSanitize ? htmlSanitize(html) : DOMPurify.sanitize(html);
 
     html = result instanceof Promise ? await result : result;
 
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
-    await this._typeNode(this.parent, doc.body, signal);
+    await this._typeNode(parent, doc.body, signal, options);
   }
 
-  async _typeNode(parent, node, signal) {
+  async _typeNode(parent, node, signal, options) {
     const children = Array.from(node.childNodes);
 
     for (let child of children) {
-      if (signal.aborted || !this._parentStillExists()) break;
+      if (signal.aborted || !this._parentStillExists(parent)) break;
 
       if (
         child.nodeType === Node.TEXT_NODE &&
         child.textContent.trim().length > 0
       ) {
-        await this._typeText(child.textContent, parent, signal);
+        await this._typeText(child.textContent, parent, signal, options);
       } else if (child.nodeType === Node.ELEMENT_NODE) {
         const el = document.createElement(child.tagName);
 
@@ -271,8 +311,8 @@ export class TypeMorph {
     }
   }
 
-  async _typeText(text, parent, signal) {
-    if (!text || signal.aborted || !this._parentStillExists()) return;
+  async _typeText(text, parent, signal, options) {
+    if (!text || signal.aborted || !this._parentStillExists(parent)) return;
 
     if (this._cursorEl) {
       if (this._cursorEl.parentNode) {
@@ -285,33 +325,38 @@ export class TypeMorph {
     let buffer = "";
     let scrollCounter = 0;
 
+    const speed = options?.speed ?? this.speed;
+    const autoScroll = options?.autoScroll ?? this.config.autoScroll;
+    const scrollInterval = options?.scrollInterval ?? this.scrollInterval;
+    const chunkSize = options?.chunkSize ?? this.chunkSize;
+
     for (let i = 0; i < chars.length; i++) {
-      if (signal.aborted || !this._parentStillExists()) break;
+      if (signal.aborted || !this._parentStillExists(parent)) break;
 
       buffer += chars[i];
 
-      const append = buffer.length >= this.chunkSize || i === chars.length - 1;
+      const append = buffer.length >= chunkSize || i === chars.length - 1;
       if (append) {
         this._appendTextToParent(parent, buffer);
         buffer = "";
         scrollCounter++;
-        if (this.config.autoScroll && scrollCounter >= this.scrollInterval) {
+        if (autoScroll && scrollCounter >= scrollInterval) {
           parent.scrollIntoView({ behavior: "smooth", block: "end" });
           scrollCounter = 0;
         }
       }
 
-      if (this._parentStillExists() && append)
-        await this._delay(this.speed, signal);
+      if (this._parentStillExists(parent) && append)
+        await this._delay(speed, signal);
     }
 
-    if (this.config.autoScroll) {
+    if (autoScroll) {
       parent.scrollIntoView({ behavior: "smooth", block: "end" });
     }
   }
 
   _appendTextToParent(parent, text) {
-    if (!this._parentStillExists()) return;
+    if (!this._parentStillExists(parent)) return;
 
     if (this._cursorEl) {
       let previousSibling = this._cursorEl.previousSibling;
@@ -331,18 +376,21 @@ export class TypeMorph {
     }
   }
 
-  async _onFinish() {
-    this._clearCursorIfNeeded();
-    await safeCallback(this.config.onFinish, this);
+  async _onFinish(options) {
+    this._clearCursorIfNeeded(options);
+    await safeCallback(options?.onFinish ?? this.config.onFinish, this);
   }
 
-  _clearContent() {
-    this.parent.innerHTML = "";
-    if (this._cursorEl) this.parent.appendChild(this._cursorEl);
+  _clearContent(parent) {
+    parent.innerHTML = "";
+    if (this._cursorEl) parent.appendChild(this._cursorEl);
   }
 
-  _clearCursorIfNeeded() {
-    if (this.config.hideCursorOnFinishTyping) {
+  _clearCursorIfNeeded(options = {}) {
+    if (
+      options?.hideCursorOnFinishTyping ??
+      this.config.hideCursorOnFinishTyping
+    ) {
       this._removeCursor();
     }
   }
@@ -354,31 +402,31 @@ export class TypeMorph {
     }
   }
 
-  async _backspaceContent(parent, signal) {
-    if (signal.aborted || !this._parentStillExists()) return;
+  async _backspaceContent(parent, node, signal) {
+    if (signal.aborted || !this._parentStillExists(parent)) return;
 
-    const children = Array.from(parent.childNodes);
+    const children = Array.from(node.childNodes);
 
     for (let i = children.length - 1; i >= 0; i--) {
       const child = children[i];
-      if (signal.aborted || !this._parentStillExists()) return;
+      if (signal.aborted || !this._parentStillExists(parent)) return;
 
       if (this._cursorEl && child === this._cursorEl) {
         continue;
       }
 
       if (child.nodeType === Node.TEXT_NODE) {
-        await this._backspaceTextNode(child, signal);
+        await this._backspaceTextNode(child, parent, signal);
         if (child.textContent.length === 0 && child.parentNode) {
           child.parentNode.removeChild(child);
         }
       } else if (child.nodeType === Node.ELEMENT_NODE) {
-        await this._backspaceContent(child, signal);
+        await this._backspaceContent(parent, child, signal);
 
         child.parentNode.removeChild(child);
 
         if (this._cursorEl) {
-          this._appendCursorToLastTextNode(this.parent);
+          this._appendCursorToLastTextNode(parent);
         }
       }
     }
@@ -428,52 +476,63 @@ export class TypeMorph {
     });
   }
 
-  async _backspaceTextNode(node, signal) {
+  async _backspaceTextNode(node, parent, signal, options) {
     const chars = Array.from(node.textContent);
     let deleteCount = 0;
     let scrollCounter = 0;
 
-    for (let i = chars.length - 1; i >= 0; i -= this.chunkSize) {
-      if (signal.aborted || !this._parentStillExists()) break;
+    const chunkSize = options?.chunkSize ?? this.config.chunkSize;
+    const autoScroll = options?.autoScroll ?? this.config.autoScroll;
 
-      const chunkStart = Math.max(0, i - this.chunkSize + 1);
+    for (let i = chars.length - 1; i >= 0; i -= chunkSize) {
+      if (signal.aborted || !this._parentStillExists(parent)) break;
+
+      const chunkStart = Math.max(0, i - chunkSize + 1);
       const charsToKeep = chars.slice(0, chunkStart);
+      const scrollInterval = options?.scrollInterval ?? this.scrollInterval;
+      const backspaceSpeed = options?.backspaceSpeed ?? this.backspaceSpeed;
 
       node.textContent = charsToKeep.join("");
       deleteCount += i - chunkStart + 1;
 
       scrollCounter++;
-      if (this.config.autoScroll && scrollCounter >= this.scrollInterval) {
+      if (autoScroll && scrollCounter >= scrollInterval) {
         if (node.parentNode) {
           node.parentNode.scrollIntoView({ behavior: "smooth", block: "end" });
         }
         scrollCounter = 0;
       }
 
-      if (this._parentStillExists())
-        await this._delay(this.backspaceSpeed, signal);
-    }
-
-    if (this._parentStillExists() && node.parentNode && !node.textContent) {
-      node.parentNode.removeChild(node);
+      if (this._parentStillExists(parent))
+        await this._delay(backspaceSpeed, signal);
     }
 
     if (
-      this.config.autoScroll &&
-      this._parentStillExists() &&
-      node.parentNode
+      this._parentStillExists(parent) &&
+      node.parentNode &&
+      !node.textContent
     ) {
+      node.parentNode.removeChild(node);
+    }
+
+    if (autoScroll && this._parentStillExists(parent) && node.parentNode) {
       node.parentNode.scrollIntoView({ behavior: "smooth", block: "end" });
     }
   }
 
+  _resolveParent(parent = null) {
+    return this._validateParent(parent ?? this.parent);
+  }
+
   _setParent(parent) {
-    this.parent =
-      typeof parent === "string" ? document.getElementById(parent) : parent;
+    this.parent = this._validateParent(parent);
+  }
 
-    const isHtmlElement = this.parent instanceof Element;
+  _validateParent(parent) {
+    const parentEl = this._getParent(parent);
+    const isHtmlElement = parentEl instanceof Element;
 
-    if (!this.parent || !isHtmlElement) {
+    if (!parentEl || !isHtmlElement) {
       if (typeof parent === "string") {
         throw new Error(
           `TypeMorph: Parent element not found for selector #${parent}`
@@ -484,9 +543,25 @@ export class TypeMorph {
         );
       }
     }
+
+    return parentEl;
+  }
+
+  _getParent(parent) {
+    return typeof parent === "string"
+      ? document.getElementById(parent)
+      : parent;
+  }
+
+  _resolveText(text = null) {
+    return this._validateText(text ?? this.text);
   }
 
   _setText(text) {
+    this.text = this._validateText(text);
+  }
+
+  _validateText(text) {
     if (text == null) {
       throw new Error("[TypeMorph] Please provide a valid text");
     }
@@ -498,11 +573,11 @@ export class TypeMorph {
       text = String(text);
     }
 
-    this.text = text;
+    return text;
   }
 
-  _currentlyLooping() {
-    return this._isTyping && this._parentStillExists();
+  _currentlyLooping(parent) {
+    return this._isTyping && this._parentStillExists(parent);
   }
 
   _checkLifetime() {
@@ -555,7 +630,7 @@ export class TypeMorph {
     return this._operationQueue;
   }
 
-  async _cancelCurrentOperation() {
+  async _cancelCurrentOperation(options = {}) {
     if (this._abortController) {
       this._abortController.abort();
     }
@@ -567,24 +642,47 @@ export class TypeMorph {
     }
 
     this._isTyping = false;
-    this._clearCursorIfNeeded();
+    this._clearCursorIfNeeded(options);
   }
 
-  _parentStillExists() {
-    return this.parent && this.parent.isConnected;
+  _parentStillExists(parent) {
+    return parent && parent.isConnected;
   }
 
-  _validateOptions() {
-    if (typeof this.chunkSize != "number" || this.chunkSize < 1)
+  _validateOptions(options) {
+    if (!options) return;
+
+    if (
+      (options.chunkSize != null && typeof options.chunkSize != "number") ||
+      options.chunkSize < 1
+    )
       throw new Error("TypeMorph: chunkSize has to be a number > 0");
 
-    if (typeof this.loopCount != "number" || this.loopCount < 0)
+    if (
+      (options.loopCount != null && typeof options.loopCount != "number") ||
+      options.loopCount < 0
+    )
       throw new Error("TypeMorph: loopCount has to be a number >= 0");
 
-    if (typeof this.speed != "number" || this.speed < 0)
+    if (
+      (options.speed != null && typeof options.speed != "number") ||
+      options.speed < 0
+    )
       throw new Error("TypeMorph: speed has to be a number >= 0");
 
-    if (typeof this.backspaceSpeed != "number" || this.backspaceSpeed < 0)
+    if (
+      (options.backspaceSpeed != null &&
+        typeof options.backspaceSpeed != "number") ||
+      options.backspaceSpeed < 0
+    )
       throw new Error("TypeMorph: backspaceSpeed has to be a number >= 0");
+  }
+
+  _readOptions(_parent, _options) {
+    if (_parent && typeof _parent === "object" && !("nodeType" in _parent)) {
+      _options = _parent;
+      _parent = null;
+    }
+    return { _parent, _options };
   }
 }
