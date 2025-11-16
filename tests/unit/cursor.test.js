@@ -1,5 +1,5 @@
 import { expect, jest } from "@jest/globals";
-import { TypeMorph } from "../../src/typemorph.js";
+import TypeMorph from "../../src/typemorph.js";
 
 describe("TypeMorph - Cursor", () => {
   let parent;

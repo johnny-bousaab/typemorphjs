@@ -1,24 +1,3 @@
-export async function loadDeps() {
-  try {
-    const markedLib = await import(
-      "https://cdn.jsdelivr.net/npm/marked@12.0.0/lib/marked.esm.js"
-    );
-    const DOMPurify = (
-      await import("https://cdn.jsdelivr.net/npm/dompurify@3.3.0/+esm")
-    ).default;
-    return { marked: markedLib.marked, DOMPurify };
-  } catch (error) {
-    console.warn("CDN load failed, falling back to local packages");
-    return loadNodeDeps();
-  }
-}
-
-async function loadNodeDeps() {
-  const markedLib = await import("marked");
-  const DOMPurify = (await import("dompurify")).default;
-  return { marked: markedLib.marked, DOMPurify };
-}
-
 const CURSOR_CSS = `.typemorph-cursor {
   display: inline-block;
   animation: blink 1s step-start infinite;

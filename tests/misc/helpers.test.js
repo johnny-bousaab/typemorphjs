@@ -1,51 +1,11 @@
 import { expect, jest } from "@jest/globals";
-import { loadDeps, injectCursorCSS, safeCallback } from "../../src/helpers.js";
+import { injectCursorCSS, safeCallback } from "../../src/helpers.js";
 
 describe("helpers.js", () => {
   beforeEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
     document.head.innerHTML = "";
-  });
-
-  describe("loadDeps()", () => {
-    beforeEach(() => {});
-
-    afterEach(() => {});
-
-    test("should load browser deps successfully", async () => {
-      jest.doMock(
-        "https://cdn.jsdelivr.net/npm/marked@12.0.0/lib/marked.esm.js",
-        () => ({ marked: jest.fn() }),
-        { virtual: true }
-      );
-
-      jest.doMock(
-        "https://cdn.jsdelivr.net/npm/dompurify@3.3.0/+esm",
-        () => ({ default: jest.fn() }),
-        { virtual: true }
-      );
-
-      const { loadDeps } = await import("../../src/helpers.js");
-      const deps = await loadDeps();
-
-      expect(deps.marked).toBeDefined();
-      expect(deps.DOMPurify).toBeDefined();
-    });
-
-    test("should fallback to node deps when CDN fails", async () => {
-      // CDN imports not mocked so it will throw and fall back to node deps
-      jest.doMock("marked", () => ({ marked: jest.fn() }), { virtual: true });
-      jest.doMock("dompurify", () => ({ default: jest.fn() }), {
-        virtual: true,
-      });
-
-      const { loadDeps } = await import("../../src/helpers.js");
-      const deps = await loadDeps();
-
-      expect(deps.marked).toBeDefined();
-      expect(deps.DOMPurify).toBeDefined();
-    });
   });
 
   describe("injectCursorCSS()", () => {

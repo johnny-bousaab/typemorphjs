@@ -1,5 +1,62 @@
-import { defaultConfigs } from "./defaultConfigs.js";
-import { injectCursorCSS, safeCallback } from "./helpers.js";
+const defaultConfigs = {
+  text: null,
+  parent: null, // HTML element or string
+  speed: 50, // ms per character
+  chunkSize: 1,
+  loopCount: Infinity,
+  loopType: "clear", // "clear" or "backspace"
+  loopFinalBehavior: "keep", // "keep" or "remove" -> removing type depends on loopType
+  loopStartDelay: 300, // ms to wait before typing again, after backspacing/clearing, in each loop (applies after first loop, meaning loop has to be > 1)
+  loopEndDelay: 800, // ms to wait after typing, before backspacing/clearing, in each loop (applies after first loop, meaning loop has to be > 1)
+  backspaceSpeed: 50, // speed per character when backspacing. Used when loopType is "backspace"
+  showCursor: true,
+  cursorChar: "|",
+  parseMarkdown: false, // if true, will parse makrdown syntax to HTML, meaning parseHtml is implied
+  markdownInline: false, // whether to parse markdown inline, can be helpful to avoid unwanted wrappers for simple text
+  parseHtml: true,
+  markdownParse: null, // custom markdown parse function -> markdownParse(text, inline = false)
+  hideCursorOnFinishTyping: true,
+  autoScroll: true,
+  scrollInterval: 1, // characters typed before scroll is triggered when typing
+  clearBeforeTyping: true, // if type() was used on same parent, whether to clear text content before typing again
+  htmlSanitize: null, // custom html sanitize function -> htmlSanitize(html)
+  onStop: (instance) => {}, // typing has been stopped callback
+  onFinish: (instance) => {}, // typing naturally finished callback
+  onDestroy: (instance) => {}, // on instance destroy callback
+};
+
+const CURSOR_CSS = `.typemorph-cursor {
+  display: inline-block;
+  animation: blink 1s step-start infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}`;
+
+function injectCursorCSS() {
+  if (document.getElementById("typemorph-cursor-style")) return;
+  const style = document.createElement("style");
+  style.id = "typemorph-cursor-style";
+  style.textContent = CURSOR_CSS;
+  document.head.appendChild(style);
+}
+
+async function safeCallback(callback, ...args) {
+  if (typeof callback === "function") {
+    try {
+      const result = callback(...args);
+      if (result instanceof Promise) {
+        await result;
+      }
+    } catch (error) {
+      console.warn("TypeMorph: User callback error:", error);
+    }
+  }
+}
+
 // import { marked } from "marked";
 // import DOMPurify from "dompurify";
 
@@ -10,7 +67,7 @@ injectCursorCSS();
  * Handles typing, backspacing, and looping animations
  * Supports Markdown & HTML
  */
-export default class TypeMorph {
+class TypeMorph {
   constructor(config = {}) {
     if (typeof document === "undefined") {
       throw new Error("TypeMorph requires a DOM environment");
@@ -478,7 +535,6 @@ export default class TypeMorph {
 
   async _backspaceTextNode(node, parent, signal, options) {
     const chars = Array.from(node.textContent);
-    let deleteCount = 0;
     let scrollCounter = 0;
 
     const chunkSize = options?.chunkSize ?? this.config.chunkSize;
@@ -493,7 +549,6 @@ export default class TypeMorph {
       const backspaceSpeed = options?.backspaceSpeed ?? this.backspaceSpeed;
 
       node.textContent = charsToKeep.join("");
-      deleteCount += i - chunkStart + 1;
 
       scrollCounter++;
       if (autoScroll && scrollCounter >= scrollInterval) {
@@ -692,8 +747,8 @@ async function getDeps() {
   if (loadedDeps) return loadedDeps;
 
   try {
-    const markedLib = await import("marked");
-    const DOMPurify = (await import("dompurify")).default;
+    const markedLib = await import('marked');
+    const DOMPurify = (await import('dompurify')).default;
 
     loadedDeps = { marked: markedLib.marked, DOMPurify };
     return loadedDeps;
@@ -704,3 +759,6 @@ async function getDeps() {
     throw error;
   }
 }
+
+export { TypeMorph as default };
+//# sourceMappingURL=typemorph.esm.js.map

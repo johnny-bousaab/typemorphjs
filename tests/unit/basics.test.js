@@ -1,5 +1,5 @@
 import { jest } from "@jest/globals";
-import { TypeMorph } from "../../src/typemorph.js";
+import TypeMorph from "../../src/typemorph.js";
 import { CURSOR_SELECTOR, assertNoMemoryLeaks } from "../common.js";
 
 const SPEED = 10;

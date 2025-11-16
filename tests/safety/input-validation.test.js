@@ -1,5 +1,5 @@
 import { expect, jest } from "@jest/globals";
-import { TypeMorph } from "../../src/typemorph.js";
+import TypeMorph from "../../src/typemorph.js";
 import { assertNoMemoryLeaks } from "../common.js";
 
 describe("TypeMorph - Input Validation", () => {

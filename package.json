@@ -3,16 +3,23 @@
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
     "test:memory": "node --expose-gc --experimental-vm-modules ./node_modules/jest/bin/jest.js",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
-    "test:coverage:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --watch"
+    "test:coverage:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --watch",
+    "build": "rollup -c",
+    "build:watch": "rollup -c --watch",
+    "prepublishOnly": "npm run build"
   },
   "type": "module",
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-terser": "^0.4.4",
     "jest": "^30.2.0",
     "jest-environment-jsdom": "^30.2.0",
-    "jsdom": "^27.1.0"
+    "jsdom": "^27.1.0",
+    "rollup": "^4.53.2"
   },
   "dependencies": {
     "dompurify": "^3.3.0",
-    "marked": "^16.4.1"
+    "marked": "^16.4.2"
   }
 }

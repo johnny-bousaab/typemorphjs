@@ -1,18 +1,22 @@
-# ✨ TypeMorph
+# TypeMorph
 
-**TypeMorph** is a lightweight JavaScript library for creating smooth, realistic typing effects. Supports features such as looping, backspacing, HTML, markdown, and animated cursor.
+<!-- [![Tests](https://github.com/johnny-bousaab/typemorph/actions/workflows/test.yml/badge.svg)](https://github.com/johnny-bousaab/typemorph/actions)
+[![Coverage](https://codecov.io/gh/johnny-bousaab/typemorph/branch/main/graph/badge.svg)](https://codecov.io/gh/johnny-bousaab/typemorph)
+[![npm version](https://badge.fury.io/js/typemorph.svg)](https://www.npmjs.com/package/typemorph) -->
+
+**TypeMorph** is a simple JavaScript library for creating smooth, realistic typing effects. Supports features such as looping, backspacing, HTML, markdown, and animated cursor.
 Perfect for hero sections, documentation intros, LLM chat animation, or anywhere you want animated text.
 
 ## 🚀 Features
 
-- 🧠 **Typing engine**: character typing with customizable speed and chunking
-- 🔁 **Looping modes**: clear or backspace styles
-- 🧹 **Backspace control**: define speed, delay, and behavior
-- 🧾 **Markdown support**: render markdown with [Marked](https://github.com/markedjs/marked)
-- 🧼 **HTML support**: HTML is sanitized with [DOMPurify](https://github.com/cure53/DOMPurify)
-- ⚙️ **Configurable cursor**: built in and customizable blink animation
-- 🧩 **Async API**: control typing flow with `type()`, `loop()`, `stop()`, and `destroy()`
-- 🧱 **Framework agnostic**: works in plain JS, React, Vue, or anywhere with a DOM
+- **Typing engine**: character typing with customizable speed and chunking
+- **Looping modes**: clear or backspace styles
+- **Backspace control**: define speed, delay, and behavior
+- **Markdown support**: render markdown with [Marked](https://github.com/markedjs/marked)
+- **HTML support**: HTML is sanitized with [DOMPurify](https://github.com/cure53/DOMPurify)
+- **Configurable cursor**: built in and customizable blink animation
+- **Async API**: control typing flow with `type()`, `loop()`, `stop()`, and `destroy()`
+- **Framework agnostic**: works in plain JS, React, Vue, or anywhere with a DOM
 
 ## 📦 Installation
 
@@ -25,19 +29,25 @@ npm install typemorphjs
 Then import it:
 
 ```javascript
-import { TypeMorph } from "typemorphjs";
+import TypeMorph from "typemorphjs";
 ```
 
 ### Using a CDN
 
 ```html
-<script type="module">
-  import { TypeMorph } from "https://cdn.jsdelivr.net/npm/typemorphjs/dist/typemorph.min.js";
-
-  const target = document.getElementById("target");
-  const typer = new TypeMorph({ parent: target });
+<script src="https://cdn.jsdelivr.net/npm/typemorphjs/dist/typemorph.umd.min.js"></script>
+<script>
+  const typer = new TypeMorph({ parent: document.getElementById("target") });
   typer.type("Hello, world!");
 </script>
+```
+
+### Core version
+
+The core version of the library has 0 dependencies and is smaller in size, if you either provide your own HTML/MD sanitizer/parser or simply disable these features, you can use this version for efficiency:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/typemorphjs/dist/typemorph.core.umd.min.js"></script>
 ```
 
 ## ⚡ Quick Start
@@ -47,9 +57,7 @@ import { TypeMorph } from "typemorphjs";
 ```html
 <div id="target"></div>
 
-<script type="module">
-  import { TypeMorph } from "typemorphjs";
-
+<script>
   const typer = new TypeMorph({
     parent: document.getElementById("target"),
     speed: 50,
@@ -115,6 +123,7 @@ If you want to customize the cursor style, you can use the below CSS class:
 ```css
 .typemorph-cursor {
   color: red;
+  animation-duration: 0.8s;
 }
 ```
 
