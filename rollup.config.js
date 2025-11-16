@@ -1,6 +1,7 @@
 import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import terser from "@rollup/plugin-terser";
+import gzip from "rollup-plugin-gzip";
 
 const external = ["marked", "dompurify"];
 
@@ -22,7 +23,7 @@ export default [
       sourcemap: true,
     },
     external,
-    plugins: [terser()],
+    plugins: [terser(), gzip()],
   },
   {
     input: "./src/typemorph.js",
@@ -38,7 +39,7 @@ export default [
         return "typemorph";
       },
     },
-    plugins: [resolve(), commonjs(), terser()],
+    plugins: [resolve(), commonjs(), terser(), , gzip()],
   },
   {
     input: "./src/typemorph.js",
@@ -48,7 +49,7 @@ export default [
       name: "TypeMorph",
       sourcemap: true,
     },
-    plugins: [terser()],
+    plugins: [terser(), , gzip()],
     external,
   },
 ];

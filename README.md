@@ -4,7 +4,7 @@
 [![Coverage](https://codecov.io/gh/johnny-bousaab/typemorph/branch/main/graph/badge.svg)](https://codecov.io/gh/johnny-bousaab/typemorph)
 [![npm version](https://badge.fury.io/js/typemorph.svg)](https://www.npmjs.com/package/typemorph) -->
 
-**TypeMorph** is a simple JavaScript library for creating smooth, realistic typing effects. Supports features such as looping, backspacing, HTML, markdown, and animated cursor.
+**TypeMorph** is a lightweight JavaScript library for creating smooth, realistic typing effects. Supports features such as looping, backspacing, HTML, markdown, and animated cursor.
 Perfect for hero sections, documentation intros, LLM chat animation, or anywhere you want animated text.
 
 ## 🚀 Features
@@ -44,7 +44,7 @@ import TypeMorph from "typemorphjs";
 
 ### Core version
 
-The core version of the library has 0 dependencies and is smaller in size, if you either provide your own HTML/MD sanitizer/parser or simply disable these features, you can use this version for efficiency:
+The core version of the library has 0 dependencies and is smaller in size, if you either provide your own HTML/MD sanitizer/parser or simply disable these features, you can use this version for a lighter version of the library:
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/typemorphjs/dist/typemorph.core.umd.min.js"></script>
