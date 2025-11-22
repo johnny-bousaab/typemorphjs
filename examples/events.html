@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>TypeMorph Example: Events & Callbacks</title>
+    <link rel="stylesheet" href="../assets/css/examples.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/dark.min.css"
+    />
+  </head>
+
+  <body>
+    <nav>
+      <div class="nav-inner">
+        <a href="../index.html" class="nav-logo">TypeMorph</a>
+        <div class="nav-links">
+          <a href="../index.html">Home</a>
+          <a href="./index.html" class="active">Examples</a>
+          <a href="../playground/index.html">Playground</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="example-container">
+      <header class="example-header">
+        <h2>Events & Callbacks</h2>
+        <p>Trigger functions when typing finishes naturally</p>
+      </header>
+
+      <section class="example-box">
+        <div id="target" class="example-target"></div>
+        <div
+          id="status-log"
+          style="margin-top: 1rem; color: #666; font-size: 0.9em"
+        >
+          Status: Idle
+        </div>
+      </section>
+
+      <section class="example-code">
+        <button class="copy-btn" data-copy>Copy</button>
+        <pre><code>const statusDiv = document.getElementById("status-log");
+
+const typer = new TypeMorph({
+  parent: "target",
+  speed: 40,
+  onFinish: (instance) => {
+    statusDiv.textContent = "Status: Completed!";
+    statusDiv.style.color = "#4caf50";
+  }
+});
+
+statusDiv.textContent = "Status: Typing...";
+typer.type("Watch the status label below update when I finish.");
+</code></pre>
+      </section>
+    </div>
+
+    <script src="../dist/typemorph.umd.min.js"></script>
+    <script src="../assets/js/examples.js" type="module"></script>
+
+    <script>
+      const statusDiv = document.getElementById("status-log");
+
+      const typer = new TypeMorph({
+        parent: "target",
+        speed: 40,
+        onFinish: (instance) => {
+          statusDiv.textContent = "Status: Completed!";
+          statusDiv.style.color = "#4caf50";
+        },
+      });
+
+      statusDiv.textContent = "Status: Typing...";
+      typer.type("Watch the status label below update when I finish.");
+    </script>
+  </body>
+</html>

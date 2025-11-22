@@ -22,7 +22,6 @@ describe("TypeMorph - Core Basics", () => {
       hideCursorOnFinishTyping: true,
       showCursor: false,
       loopCount: 2,
-      debug: false,
     });
   });
 

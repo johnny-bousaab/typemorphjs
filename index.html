@@ -18,44 +18,52 @@
   </head>
 
   <body>
-    <header>
-      <h1>TypeMorph</h1>
-      <h2>A minimalist typing engine for the modern web</h2>
-      <div class="btn-row">
-        <a href="https://github.com/johnny-bousaab/typemorphjs" class="button"
-          >GitHub</a
-        >
-        <a href="https://www.npmjs.com/package/typemorphjs" class="button"
-          >NPM</a
-        >
-        <a href="playground.html" class="button">Playground</a>
-        <a href="examples" class="button">Examples</a>
+    <div id="home-container">
+      <header>
+        <h1>TypeMorph</h1>
+        <h2>A minimalist typing engine for the modern web</h2>
+        <div class="btn-row">
+          <a href="https://github.com/johnny-bousaab/typemorphjs" class="button"
+            >GitHub</a
+          >
+          <a href="https://www.npmjs.com/package/typemorphjs" class="button"
+            >NPM</a
+          >
+          <a href="playground.html" class="button">Playground</a>
+          <a href="examples" class="button">Examples</a>
+        </div>
+      </header>
+
+      <div class="hero-terminal">
+        <div id="hero-typer"></div>
       </div>
-    </header>
 
-    <div class="hero-terminal">
-      <div id="hero-typer"></div>
-    </div>
+      <div class="section">
+        <h2>What is TypeMorph?</h2>
+        <p>
+          TypeMorph is a lightweight typing effect engine built for precision
+          and control. It supports html, markdown, chunked typing, backspacing
+          modes, looping, custom cursors, and clean async control. Perfect for
+          documentation sites, portfolios, LLMs, or any dynamic text UI.
+        </p>
 
-    <div class="section">
-      <h2>What is TypeMorph?</h2>
-      <p>
-        TypeMorph is a lightweight typing effect engine built for precision and
-        control. It supports html, markdown, chunked typing, backspacing modes,
-        looping, custom cursors, and clean async control. Perfect for
-        documentation sites, portfolios, LLMs, or any dynamic text UI.
-      </p>
+        <p class="section-footer">
+          Built for developers. Designed for the modern web.
+        </p>
+      </div>
 
-      <p class="section-footer">
-        Built for developers. Designed for the modern web.
-      </p>
+      <button id="live-demo-btn" class="live-demo-btn">Live Demo</button>
     </div>
 
     <script src="./dist/typemorph.umd.min.js"></script>
     <script>
       const heroTarget = document.getElementById("hero-typer");
+      const liveDemoBtn = document.getElementById("live-demo-btn");
+      const ac = new AbortController();
 
-      const heroTyper = new TypeMorph({
+      liveDemoBtn.addEventListener("click", renderPageAnimated);
+
+      const typer = new TypeMorph({
         parent: heroTarget,
         cursorChar: "_",
         loopType: "backspace",
@@ -71,17 +79,46 @@
       exec();
 
       async function exec() {
-        await heroTyper.loop(
+        await typer.loop(
           "TypeMorph loaded\nWelcome to the demo page\nEdit. Type. Morph."
         );
 
-        await heroTyper.loop(
-          "Supports HTML, Markdown,\nbackspacing, looping, flow control,\nand more."
-        );
+        if (!ac.signal.aborted) {
+          await typer.loop(
+            "Supports HTML, Markdown,\nbackspacing, looping, flow control,\nand more."
+          );
+        }
 
-        await heroTyper.type(
-          "Lightweight and simple to use.\nCheck all information on <a href='https://github.com/johnny-bousaab/typemorphjs'>Github<a/>!"
-        );
+        if (!ac.signal.aborted) {
+          await typer.type(
+            "Lightweight and simple to use.\nCheck all information on <a href='https://github.com/johnny-bousaab/typemorphjs'>Github<a/>!"
+          );
+        }
+      }
+
+      async function renderPageAnimated() {
+        typer.stop();
+        ac.abort();
+        heroTarget.innerHTML =
+          "More information on <a href='https://github.com/johnny-bousaab/typemorphjs'>Github<a/>!";
+
+        const container = document.getElementById("home-container");
+
+        const homepageTyper = new TypeMorph({
+          parent: container,
+          autoScroll: false,
+          showCursor: false,
+          parseHtml: true,
+          speed: 50,
+        });
+
+        liveDemoBtn.remove();
+        const html = container.innerHTML.replace(/ {2,}/g, " ");
+        container.innerHTML = "";
+
+        await homepageTyper.type(html, {
+          speed: 15,
+        });
       }
     </script>
   </body>

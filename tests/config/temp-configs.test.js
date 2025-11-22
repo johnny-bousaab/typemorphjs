@@ -39,15 +39,50 @@ describe("TypeMorph - Temporary Config Overrides", () => {
   });
 
   test("should override speed temporarily", async () => {
+    const typer = new TypeMorph({
+      parent,
+      speed: 100,
+      showCursor: false,
+      clearBeforeTyping: true,
+    });
+
     const text = "12345";
     typer.type(text);
-    await jest.advanceTimersByTimeAsync(100 * 5);
+    await jest.advanceTimersByTimeAsync(100 * 4);
     expect(parent.textContent).toBe(text);
 
-    typer.type(text, { speed: 1 });
-    await jest.runAllTimersAsync(5);
-    expect(parent.textContent).toBe(text);
+    const tempSpeed = 200;
+
+    typer.type(text, { speed: tempSpeed });
     expect(typer.config.speed).toBe(100);
+
+    await jest.advanceTimersByTimeAsync(tempSpeed);
+    expect(parent.textContent).toBe("12");
+
+    await jest.advanceTimersByTimeAsync(600);
+    expect(parent.textContent).toBe(text);
+  });
+
+  test("should override backspace speed temporarily", async () => {
+    const typer = new TypeMorph({
+      parent,
+      backspaceSpeed: 1,
+      speed: 1,
+      showCursor: false,
+      clearBeforeTyping: true,
+      loopCount: 3,
+      loopStartDelay: 0,
+      loopEndDelay: 0,
+    });
+
+    const text = "12345";
+    const tempBackspaceSpeed = 200;
+
+    typer.loop(text, { backspaceSpeed: tempBackspaceSpeed });
+    expect(typer.config.backspaceSpeed).toBe(1);
+
+    await jest.advanceTimersByTimeAsync(4 + tempBackspaceSpeed * 2);
+    expect(parent.textContent).toBe("123");
   });
 
   test("should override chunkSize per operation", async () => {
@@ -71,6 +106,7 @@ describe("TypeMorph - Temporary Config Overrides", () => {
       loopType: "backspace",
       loopCount: 2,
       speed: 1,
+      backspaceSpeed: 1,
       loopEndDelay: 0,
       loopStartDelay: 0,
       chunkSize: 1,
@@ -78,7 +114,7 @@ describe("TypeMorph - Temporary Config Overrides", () => {
     });
     await jest.advanceTimersByTimeAsync(7);
 
-    expect(parent.textContent.length).toBe(3);
+    expect(parent.textContent.length).toBe(2);
     expect(typer.config.loopType).toBe("clear");
   });
 

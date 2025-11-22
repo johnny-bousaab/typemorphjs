@@ -1,7 +1,5 @@
 import { defaultConfigs } from "./defaultConfigs.js";
 import { injectCursorCSS, safeCallback } from "./helpers.js";
-// import { marked } from "marked";
-// import DOMPurify from "dompurify";
 
 injectCursorCSS();
 
@@ -34,6 +32,8 @@ export default class TypeMorph {
     this._isTyping = false;
     this._operationQueue = Promise.resolve();
     this._activeTimers = new Set();
+    this._userScrolled = false;
+    this._scrollListener = null;
 
     this._validateOptions(this.config);
   }
@@ -145,6 +145,8 @@ export default class TypeMorph {
       this._clearContent(targetParent);
     }
 
+    this._setupScrollTracking(targetParent);
+
     try {
       do {
         if (signal.aborted) break;
@@ -186,7 +188,12 @@ export default class TypeMorph {
           if (loopType === "clear") {
             this._clearContent(targetParent);
           } else {
-            await this._backspaceContent(targetParent, targetParent, signal);
+            await this._backspaceContent(
+              targetParent,
+              targetParent,
+              signal,
+              options
+            );
           }
         }
 
@@ -208,6 +215,8 @@ export default class TypeMorph {
   async _type(text, parent, options, signal) {
     const targetParent = this._resolveParent(parent);
     const targetText = this._resolveText(text);
+
+    if (!options.loopSource) this._setupScrollTracking(targetParent);
 
     this._isTyping = true;
 
@@ -308,7 +317,7 @@ export default class TypeMorph {
         }
 
         parent.appendChild(el);
-        await this._typeNode(el, child, signal);
+        await this._typeNode(el, child, signal, options);
       }
     }
   }
@@ -343,7 +352,7 @@ export default class TypeMorph {
         buffer = "";
         scrollCounter++;
         if (autoScroll && scrollCounter >= scrollInterval) {
-          parent.scrollIntoView({ behavior: "smooth", block: "end" });
+          this._scrollToEnd(parent);
           scrollCounter = 0;
         }
       }
@@ -353,7 +362,7 @@ export default class TypeMorph {
     }
 
     if (autoScroll) {
-      parent.scrollIntoView({ behavior: "smooth", block: "end" });
+      this._scrollToEnd(parent);
     }
   }
 
@@ -404,7 +413,7 @@ export default class TypeMorph {
     }
   }
 
-  async _backspaceContent(parent, node, signal) {
+  async _backspaceContent(parent, node, signal, options) {
     if (signal.aborted || !this._parentStillExists(parent)) return;
 
     const children = Array.from(node.childNodes);
@@ -418,9 +427,9 @@ export default class TypeMorph {
       }
 
       if (child.nodeType === Node.TEXT_NODE) {
-        await this._backspaceTextNode(child, parent, signal);
+        await this._backspaceTextNode(child, parent, signal, options);
       } else if (child.nodeType === Node.ELEMENT_NODE) {
-        await this._backspaceContent(parent, child, signal);
+        await this._backspaceContent(parent, child, signal, options);
 
         if (!signal.aborted) {
           child.parentNode.removeChild(child);
@@ -498,7 +507,7 @@ export default class TypeMorph {
       scrollCounter++;
       if (autoScroll && scrollCounter >= scrollInterval) {
         if (node.parentNode) {
-          node.parentNode.scrollIntoView({ behavior: "smooth", block: "end" });
+          this._scrollToEnd(parent);
         }
         scrollCounter = 0;
       }
@@ -516,7 +525,7 @@ export default class TypeMorph {
     }
 
     if (autoScroll && this._parentStillExists(parent) && node.parentNode) {
-      node.parentNode.scrollIntoView({ behavior: "smooth", block: "end" });
+      this._scrollToEnd(parent);
     }
   }
 
@@ -643,6 +652,7 @@ export default class TypeMorph {
 
     this._isTyping = false;
     this._clearCursorIfNeeded(options);
+    this._clearScrollListener();
   }
 
   _parentStillExists(parent) {
@@ -684,6 +694,38 @@ export default class TypeMorph {
       _parent = null;
     }
     return { _parent, _options };
+  }
+
+  _scrollToEnd(parent) {
+    if (this._userScrolled) return;
+    parent.scrollTo({
+      top: parent.scrollHeight,
+      behavior: "smooth",
+    });
+  }
+
+  _setupScrollTracking(parent) {
+    this._clearScrollListener();
+
+    const handler = () => {
+      const distanceToBottom =
+        parent.scrollHeight - parent.scrollTop - parent.clientHeight;
+      this._userScrolled = distanceToBottom > 0;
+    };
+
+    parent.addEventListener("scroll", handler, { passive: true });
+    this._scrollListener = { element: parent, handler };
+  }
+
+  _clearScrollListener() {
+    if (this._scrollListener) {
+      this._scrollListener.element.removeEventListener(
+        "scroll",
+        this._scrollListener.handler
+      );
+      this._scrollListener = null;
+    }
+    this._userScrolled = false;
   }
 }
 

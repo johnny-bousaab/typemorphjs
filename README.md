@@ -44,7 +44,7 @@ import TypeMorph from "typemorphjs";
 
 ### Core version
 
-The core version of the library has 0 dependencies and is smaller in size, if you either provide your own HTML/MD sanitizer/parser or simply disable these features, you can use this version for a lighter version of the library:
+The core version of the library has 0 dependencies and is smaller in size, if you either provide your own HTML/MD sanitizer/parser or simply disable these features, you can use the core only for a lighter version of the library:
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/typemorphjs/dist/typemorph.core.umd.min.js"></script>
@@ -129,32 +129,32 @@ If you want to customize the cursor style, you can use the below CSS class:
 
 ## ⚙️ Configuration Options
 
-| Option                     | Type                     | Default    | Description                                                                                                                   |
-| -------------------------- | ------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `text`                     | `string \| null`         | `null`     | Optional initial text for this instance.                                                                                      |
-| `parent`                   | `HTMLElement \| string`  | `null`     | The target element or its id where the text will appear.                                                                      |
-| `speed`                    | `number`                 | `50`       | Delay in milliseconds per character (or chunk).                                                                               |
-| `chunkSize`                | `number`                 | `1`        | Number of characters typed in one iteration.                                                                                  |
-| `loopCount`                | `number`                 | `Infinity` | Number of loops before stopping.                                                                                              |
-| `loopType`                 | `"clear" \| "backspace"` | `"clear"`  | Defines how text is removed between loops, cleared instantly or backspaced.                                                   |
-| `loopFinalBehavior`        | `"keep" \| "remove"`     | `"keep"`   | Defines behavior at the final loop. `"keep"` just keeps the text at the end, `"remove"` deletes it (respecting `"loopType"`). |
-| `loopStartDelay`           | `number`                 | `300`      | Delay before restarting the typing after clearing/backspacing.                                                                |
-| `loopEndDelay`             | `number`                 | `800`      | Delay after typing finishes, before starting backspacing/clearing.                                                            |
-| `backspaceSpeed`           | `number`                 | `50`       | Delay in milliseconds per character when backspacing.                                                                         |
-| `showCursor`               | `boolean`                | `true`     | Shows a blinking cursor (`\|`) at the end of the text.                                                                        |
-| `cursorChar`               | `string`                 | `\|`       | The character used for the cursor.                                                                                            |
-| `parseMarkdown`            | `boolean`                | `false`    | If true, parses markdown syntax into HTML (implies `parseHtml = true`).                                                       |
-| `markdownInline`           | `boolean`                | `false`    | Parses markdown inline, avoiding unwanted block wrappers for short text.                                                      |
-| `parseHtml`                | `boolean`                | `true`     | Whether to interpret HTML in the text.                                                                                        |
-| `markdownParse`            | `function \| null`       | `null`     | Custom markdown parser => `(text, inline) => html`.                                                                           |
-| `hideCursorOnFinishTyping` | `boolean`                | `true`     | Automatically hides the cursor when typing completes (if not looping).                                                        |
-| `autoScroll`               | `boolean`                | `true`     | Automatically scrolls the parent element into view while typing.                                                              |
-| `scrollInterval`           | `number`                 | `1`        | Number of chunks typed before auto-scroll triggers.                                                                           |
-| `clearBeforeTyping`        | `boolean`                | `true`     | If true, clears the parent’s text before typing new text.                                                                     |
-| `htmlSanitize`             | `function \| null`       | `null`     | Custom HTML sanitizer => `(html) => safeHtml`.                                                                                |
-| `onStop`                   | `function(instance)`     | `() => {}` | Called when a typing operation is stopped manually via `.stop()`.                                                             |
-| `onFinish`                 | `function(instance)`     | `() => {}` | Called when typing completes naturally (no loop or final loop iteration).                                                     |
-| `onDestroy`                | `function(instance)`     | `() => {}` | Called when the instance is destroyed and all resources are cleaned up.                                                       |
+| Option                     | Type                     | Default       | Description                                                                                                                                              |
+| -------------------------- | ------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `text`                     | `string \| null`         | `null`        | Optional initial text for this instance.                                                                                                                 |
+| `parent`                   | `HTMLElement \| string`  | `null`        | The target element or its id where the text will appear.                                                                                                 |
+| `speed`                    | `number`                 | `50`          | Delay in milliseconds per character (or chunk).                                                                                                          |
+| `chunkSize`                | `number`                 | `1`           | Number of characters typed in one iteration.                                                                                                             |
+| `loopCount`                | `number`                 | `Infinity`    | Number of loops before stopping.                                                                                                                         |
+| `loopType`                 | `"clear" \| "backspace"` | `"backspace"` | Defines how text is removed between loops, cleared instantly or backspaced.                                                                              |
+| `loopFinalBehavior`        | `"keep" \| "remove"`     | `"keep"`      | Defines behavior at the final loop. `"keep"` just keeps the text at the end, `"remove"` deletes it (respecting `"loopType"`).                            |
+| `loopStartDelay`           | `number`                 | `300`         | Delay before restarting the typing after clearing/backspacing.                                                                                           |
+| `loopEndDelay`             | `number`                 | `800`         | Delay after typing finishes, before starting backspacing/clearing.                                                                                       |
+| `backspaceSpeed`           | `number`                 | `50`          | Delay in milliseconds per character when backspacing.                                                                                                    |
+| `showCursor`               | `boolean`                | `true`        | Shows a blinking cursor (`\|`) at the end of the text.                                                                                                   |
+| `cursorChar`               | `string`                 | `\|`          | The character used for the cursor.                                                                                                                       |
+| `parseMarkdown`            | `boolean`                | `false`       | If true, parses markdown syntax into HTML (implies `parseHtml = true`).                                                                                  |
+| `markdownInline`           | `boolean`                | `false`       | Parses markdown inline, avoiding unwanted block wrappers for short text.                                                                                 |
+| `parseHtml`                | `boolean`                | `true`        | Whether to interpret HTML in the text. If you are using parseMarkdown with this, it's recommended you set markdownInline to true to avoid layout issues. |
+| `markdownParse`            | `function \| null`       | `null`        | Custom markdown parser => `(text, inline) => html`.                                                                                                      |
+| `hideCursorOnFinishTyping` | `boolean`                | `true`        | Automatically hides the cursor when typing completes (if not looping).                                                                                   |
+| `autoScroll`               | `boolean`                | `true`        | Automatically scrolls the parent element to end while typing, Unless user scrolls manually                                                               |
+| `scrollInterval`           | `number`                 | `1`           | Number of chunks typed before auto-scroll triggers.                                                                                                      |
+| `clearBeforeTyping`        | `boolean`                | `true`        | If true, clears the parent’s text before typing new text.                                                                                                |
+| `htmlSanitize`             | `function \| null`       | `null`        | Custom HTML sanitizer => `(html) => safeHtml`.                                                                                                           |
+| `onStop`                   | `function(instance)`     | `() => {}`    | Called when a typing operation is stopped manually via `.stop()`.                                                                                        |
+| `onFinish`                 | `function(instance)`     | `() => {}`    | Called when typing completes naturally (no loop or final loop iteration).                                                                                |
+| `onDestroy`                | `function(instance)`     | `() => {}`    | Called when the instance is destroyed and all resources are cleaned up.                                                                                  |
 
 ---
 

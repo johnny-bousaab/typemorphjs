@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>TypeMorph Example: Cursor Behavior</title>
+    <link rel="stylesheet" href="../assets/css/examples.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/dark.min.css"
+    />
+  </head>
+
+  <body>
+    <nav>
+      <div class="nav-inner">
+        <a href="../index.html" class="nav-logo">TypeMorph</a>
+        <div class="nav-links">
+          <a href="../index.html">Home</a>
+          <a href="./index.html" class="active">Examples</a>
+          <a href="../playground/index.html">Playground</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="example-container">
+      <header class="example-header">
+        <h2>Cursor Customization</h2>
+        <p>Change the cursor character and toggle visibility states</p>
+      </header>
+
+      <section class="example-box">
+        <div id="target" class="example-target"></div>
+      </section>
+
+      <section class="example-code">
+        <button class="copy-btn" data-copy>Copy</button>
+        <pre><code>const typer = new TypeMorph({
+  parent: "target",
+  speed: 60,
+  showCursor: true,
+  cursorChar: "_",
+  hideCursorOnFinishTyping: false,
+});
+
+typer.type("I use a cursor that keeps blinking after I stop.");
+</code></pre>
+      </section>
+    </div>
+
+    <script src="../dist/typemorph.umd.min.js"></script>
+    <script src="../assets/js/examples.js" type="module"></script>
+
+    <script>
+      const typer = new TypeMorph({
+        parent: "target",
+        speed: 60,
+        showCursor: true,
+        cursorChar: "_",
+        hideCursorOnFinishTyping: false,
+      });
+
+      typer.type("I use a cursor that keeps blinking after I stop.");
+    </script>
+  </body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>TypeMorph Example: Auto Scroll</title>
+    <link rel="stylesheet" href="../assets/css/examples.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/dark.min.css"
+    />
+    <style>
+      #target {
+        padding: 10px;
+        font-size: 20px;
+        height: 40px;
+        overflow-y: auto;
+        border: 1px solid #333;
+        border-radius: 4px;
+        background: #0d1117;
+      }
+    </style>
+  </head>
+
+  <body>
+    <nav>
+      <div class="nav-inner">
+        <a href="../index.html" class="nav-logo">TypeMorph</a>
+        <div class="nav-links">
+          <a href="../index.html">Home</a>
+          <a href="./index.html" class="active">Examples</a>
+          <a href="../playground/index.html">Playground</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="example-container">
+      <header class="example-header">
+        <h2>Auto Scroll</h2>
+        <p>Automatically scroll to the bottom as content overflows</p>
+      </header>
+
+      <section class="example-box">
+        <div id="target"></div>
+      </section>
+
+      <section class="example-code">
+        <button class="copy-btn" data-copy>Copy</button>
+        <pre><code>const typer = new TypeMorph({
+  parent: "target",
+  speed: 20,
+  autoScroll: true,
+  scrollInterval: 5,
+});
+
+const longText = "This is a very long text string that is intended to overflow the vertical container boundaries. As the typing progresses, TypeMorph will automatically scroll the container to ensure the cursor and the newest text remain visible at all times. This is particularly useful for chat interfaces, logs, or terminal simulations.";
+
+typer.type(longText);
+</code></pre>
+      </section>
+    </div>
+
+    <script src="../dist/typemorph.umd.min.js"></script>
+    <script src="../assets/js/examples.js" type="module"></script>
+
+    <script>
+      const typer = new TypeMorph({
+        parent: "target",
+        speed: 20,
+        autoScroll: true,
+        scrollInterval: 5,
+      });
+
+      const longText =
+        "This is a very long text string that is intended to overflow the vertical container boundaries. As the typing progresses, TypeMorph will automatically scroll the container to ensure the cursor and the newest text remain visible at all times. This is particularly useful for chat interfaces, logs, or terminal simulations.";
+
+      typer.loop(longText);
+    </script>
+  </body>
+</html>

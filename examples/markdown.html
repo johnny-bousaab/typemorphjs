@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>TypeMorph Example: HTML Mode</title>
+    <title>TypeMorph Example: Markdown Mode</title>
     <link rel="stylesheet" href="../assets/css/examples.css" />
     <link
       rel="stylesheet"
@@ -24,8 +24,8 @@
 
     <div class="example-container">
       <header class="example-header">
-        <h2>HTML Mode</h2>
-        <p>Typing HTML with proper parsing and sanitization</p>
+        <h2>Markdown Mode</h2>
+        <p>Enable Markdown parsing for styled text output</p>
       </header>
 
       <section class="example-box">
@@ -37,10 +37,10 @@
         <pre><code>const typer = new TypeMorph({
   parent: "target",
   speed: 40,
-  parseHtml: true,
+  parseMarkdown: true,
 });
 
-typer.type("&lt;strong&gt;This is bold text&lt;/strong&gt; and &lt;em&gt;this is italic&lt;/em&gt;");
+typer.type("# Heading Level 1\\n**Bold text** and _italic text_");
 </code></pre>
       </section>
     </div>
@@ -52,12 +52,10 @@ typer.type("&lt;strong&gt;This is bold text&lt;/strong&gt; and &lt;em&gt;this is
       const typer = new TypeMorph({
         parent: "target",
         speed: 40,
-        parseHtml: true,
+        parseMarkdown: true,
       });
 
-      typer.type(
-        "<strong>This is bold text</strong> and <em>this is italic</em>. "
-      );
+      typer.type("# Heading Level 1\n**Bold text** and _italic text_");
     </script>
   </body>
 </html>

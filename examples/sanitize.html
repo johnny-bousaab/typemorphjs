@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>TypeMorph Example: Sanitized HTML Typing</title>
+    <link rel="stylesheet" href="../assets/css/examples.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/dark.min.css"
+    />
+  </head>
+
+  <body>
+    <nav>
+      <div class="nav-inner">
+        <a href="../index.html" class="nav-logo">TypeMorph</a>
+        <div class="nav-links">
+          <a href="../index.html">Home</a>
+          <a href="./index.html" class="active">Examples</a>
+          <a href="../playground/index.html">Playground</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="example-container">
+      <header class="example-header">
+        <h2>Sanitized HTML Typing</h2>
+        <p>
+          Type raw HTML content while enabling sanitization to automatically
+          strip malicious or unallowed tags.
+        </p>
+      </header>
+
+      <section class="example-box">
+        <div id="target" class="example-target"></div>
+      </section>
+
+      <section class="example-code">
+        <button class="copy-btn" data-copy>Copy</button>
+        <pre><code>const maliciousContent = `
+&lt;em>Safe Content.&lt;/em> 
+&lt;script>alert('XSS Attempt!')&lt;/script> 
+&lt;a href="javascript:void(0)">Click&lt;/a>
+`;
+
+const typer = new TypeMorph({
+  parent: "target",
+  speed: 50,
+  parseHTML: true, 
+});
+
+typer.type(maliciousContent);
+
+</code></pre>
+      </section>
+    </div>
+
+    <script src="../dist/typemorph.umd.min.js"></script>
+    <script src="../assets/js/examples.js" type="module"></script>
+
+    <script>
+      const maliciousContent = `
+        <em>Safe Content. </em>
+        <script>alert('XSS Attempt!')<\/script>
+        <a href="javascript:void(0)">Click here</a>
+      `;
+
+      const typer = new TypeMorph({
+        parent: "target",
+        speed: 50,
+        parseHTML: true,
+      });
+
+      typer.type(maliciousContent);
+    </script>
+  </body>
+</html>

@@ -81,6 +81,8 @@ h2 {
   gap: 12px;
   justify-content: center;
   flex-wrap: wrap;
+  width: fit-content;
+  margin: auto;
 }
 
 a.button {
@@ -107,6 +109,36 @@ a.button:hover {
 .typemorph-cursor {
   display: inline-block;
   animation-duration: 0.8s;
+}
+
+#home-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 26px;
+}
+
+.live-demo-btn {
+  padding: 0.65rem 1.4rem;
+  font-size: 0.95rem;
+  color: #ffffff;
+  background: #3a3f44;
+  border: 1px solid #555b61;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.live-demo-btn:hover {
+  background: #4a5056;
+}
+
+.live-demo-btn:active {
+  transform: scale(0.97);
+  background: #5c636a;
 }
 
 @media screen and (max-width: 920px) {
