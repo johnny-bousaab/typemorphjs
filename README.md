@@ -4,7 +4,7 @@
 [![Coverage](https://codecov.io/gh/johnny-bousaab/typemorph/branch/main/graph/badge.svg)](https://codecov.io/gh/johnny-bousaab/typemorph)
 [![npm version](https://badge.fury.io/js/typemorph.svg)](https://www.npmjs.com/package/typemorph) -->
 
-**TypeMorph** is a lightweight JavaScript library for creating smooth, realistic typing effects. Supports features such as looping, backspacing, HTML, markdown, and animated cursor.
+**TypeMorph** is a lightweight JavaScript library for creating smooth, realistic typing effects. Supports features such as looping, backspacing, HTML, markdown, autoscrolling, and animated cursor.
 Perfect for hero sections, documentation intros, LLM chat animation, or anywhere you want animated text.
 
 ## 🚀 Features
@@ -160,14 +160,14 @@ If you want to customize the cursor style, you can use the below CSS class:
 
 ## 🧩 API Methods
 
-| Method                                                        | Returns         | Description                                                                                                        |
-| ------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **`type(text: string, parent?: HTMLElement, options = {})`**  | `Promise<void>` | Types the provided text into the target element once.                                                              |
-| **`loop(text?: string, parent?: HTMLElement, options = {})`** | `Promise<void>` | Starts looping typing animation using the configured `loopType`. If `text` is provided, it overrides the last one. |
-| **`stop()`**                                                  | `Promise<void>` | Gracefully stops any ongoing typing or looping operation.                                                          |
-| **`destroy()`**                                               | `void`          | Stops all operations, removes timers, event listeners, and the cursor.                                             |
-| **`isTyping()`**                                              | `boolean`       | Returns whether the instance is currently typing, looping or backspacing.                                          |
-| **`getCurrentLoop()`**                                        | `number`        | Returns the current loop iteration index. Useful for monitoring progress.                                          |
+| Method                                                        | Returns         | Description                                                               |
+| ------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------- |
+| **`type(text: string, parent?: HTMLElement, options = {})`**  | `Promise<void>` | Types the provided text into the target element once.                     |
+| **`loop(text?: string, parent?: HTMLElement, options = {})`** | `Promise<void>` | Starts looping typing animation using the configured `loopType`.          |
+| **`stop()`**                                                  | `Promise<void>` | Gracefully stops any ongoing typing or looping operation.                 |
+| **`destroy()`**                                               | `void`          | Stops all operations, removes timers, event listeners, and the cursor.    |
+| **`isTyping()`**                                              | `boolean`       | Returns whether the instance is currently typing, looping or backspacing. |
+| **`getCurrentLoop()`**                                        | `number`        | Returns the current loop iteration index. Useful for monitoring progress. |
 
 ---
 

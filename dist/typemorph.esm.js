@@ -150,6 +150,7 @@ class TypeMorph {
     this.stop();
     this._abortController = null;
     this._removeCursor();
+    this._clearScrollListener();
     this._destroyed = true;
 
     safeCallback(this.config.onDestroy, this);
@@ -687,6 +688,7 @@ class TypeMorph {
         if (this._abortController === controller) {
           this._abortController = null;
         }
+        this._clearScrollListener();
       }
     })();
 
@@ -751,9 +753,10 @@ class TypeMorph {
   }
 
   _scrollToEnd(parent) {
+    if (parent.scrollHeight <= parent.clientHeight) return;
     if (this._userScrolled) return;
     parent.scrollTo({
-      top: parent.scrollHeight,
+      top: parent.scrollHeight - parent.clientHeight,
       behavior: "smooth",
     });
   }

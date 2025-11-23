@@ -1,4 +1,4 @@
-import { jest } from "@jest/globals";
+import { expect, jest } from "@jest/globals";
 import TypeMorph from "../../src/typemorph.js";
 
 describe("TypeMorph - Auto-Scroll", () => {
@@ -11,14 +11,28 @@ describe("TypeMorph - Auto-Scroll", () => {
     document.body.innerHTML = '<div id="target"></div>';
     parent = document.getElementById("target");
 
-    parent.style.height = "100px";
-    parent.style.overflow = "auto";
-
     typer = new TypeMorph({
       parent,
       autoScroll: true,
       speed: 1,
       showCursor: false,
+    });
+
+    parent.scrollTo = jest.fn((options) => {
+      if (typeof options === "object" && options.top !== undefined) {
+        parent.scrollTop = options.top;
+      }
+    });
+
+    Object.defineProperties(parent, {
+      scrollHeight: {
+        get: () => 500,
+        configurable: true,
+      },
+      clientHeight: {
+        get: () => 100,
+        configurable: true,
+      },
     });
   });
 
@@ -35,188 +49,140 @@ describe("TypeMorph - Auto-Scroll", () => {
     await jest.runAllTimersAsync();
 
     expect(parent.scrollTop).toBeGreaterThan(0);
-    expect(parent.scrollTop + parent.clientHeight).toBeCloseTo(
-      parent.scrollHeight,
+    expect(parent.scrollTop).toBeCloseTo(
+      parent.scrollHeight - parent.clientHeight,
       0
     );
   });
 
-  // test("should not auto-scroll when autoScroll=false", async () => {
-  //   parent.style.height = "100px";
-  //   parent.style.overflow = "auto";
+  test("should not autoscroll when autoScroll=false", async () => {
+    typer = new TypeMorph({
+      parent,
+      showCursor: false,
+      speed: 1,
+      autoScroll: false,
+    });
 
-  //   typer = new TypeMorph({
-  //     parent,
-  //     showCursor: false,
-  //     speed: 1,
-  //     autoScroll: false,
-  //   });
+    const longText = "A".repeat(200);
+    typer.type(longText);
+    await jest.runAllTimersAsync();
 
-  //   const longText = "A".repeat(200);
-  //   typer.type(longText);
-  //   await jest.runAllTimersAsync();
+    expect(parent.scrollTop).toBe(0);
+  });
 
-  //   // Should remain at top
-  //   expect(parent.scrollTop).toBe(0);
-  // });
+  test("should respect scrollInterval for scroll throttling", async () => {
+    const scrollSpy = jest.spyOn(parent, "scrollTo");
 
-  // test("should respect scrollInterval for scroll throttling", async () => {
-  //   parent.style.height = "100px";
-  //   parent.style.overflow = "auto";
+    typer = new TypeMorph({
+      parent,
+      showCursor: false,
+      speed: 1,
+      autoScroll: true,
+      scrollInterval: 10,
+    });
 
-  //   const scrollSpy = jest.spyOn(parent, "scrollTo");
+    const text = "A".repeat(50);
+    typer.type(text);
+    await jest.runAllTimersAsync();
 
-  //   typer = new TypeMorph({
-  //     parent,
-  //     showCursor: false,
-  //     speed: 1,
-  //     autoScroll: true,
-  //     scrollInterval: 10,
-  //   });
+    expect(scrollSpy).toHaveBeenCalled();
+    expect(scrollSpy.mock.calls.length).toBeLessThan(50);
+    expect(scrollSpy.mock.calls.length).toBeGreaterThan(3);
 
-  //   const text = "A".repeat(50);
-  //   typer.type(text);
-  //   await jest.runAllTimersAsync();
+    scrollSpy.mockRestore();
+  });
 
-  //   // Should scroll ~5 times (50 chars / 10 interval)
-  //   expect(scrollSpy).toHaveBeenCalled();
-  //   expect(scrollSpy.mock.calls.length).toBeLessThan(50);
-  //   expect(scrollSpy.mock.calls.length).toBeGreaterThan(3);
+  test("should stop auto scrolling when user scrolls up", async () => {
+    const longText = "A".repeat(200);
+    typer.type(longText);
 
-  //   scrollSpy.mockRestore();
-  // });
+    await jest.advanceTimersByTimeAsync(50);
 
-  // test("should stop auto-scrolling when user scrolls up", async () => {
-  //   parent.style.height = "100px";
-  //   parent.style.overflow = "auto";
+    parent.scrollTop = 0;
+    parent.dispatchEvent(new Event("scroll"));
 
-  //   typer = new TypeMorph({
-  //     parent,
-  //     showCursor: false,
-  //     speed: 1,
-  //     autoScroll: true,
-  //   });
+    await jest.runAllTimersAsync();
 
-  //   const longText = "A".repeat(200);
-  //   typer.type(longText);
+    expect(parent.scrollTop).toBe(0);
+  });
 
-  //   // Let some typing happen
-  //   await jest.advanceTimersByTimeAsync(50);
+  test("should resume auto-scrolling when user scrolls back to bottom", async () => {
+    const longText = "A".repeat(200);
+    typer.type(longText);
 
-  //   // User scrolls up
-  //   parent.scrollTop = 0;
-  //   parent.dispatchEvent(new Event("scroll"));
+    await jest.advanceTimersByTimeAsync(50);
 
-  //   // Continue typing
-  //   await jest.runAllTimersAsync();
+    parent.scrollTop = 0;
+    parent.dispatchEvent(new Event("scroll"));
 
-  //   // Should stay at top (user scrolled)
-  //   expect(parent.scrollTop).toBe(0);
-  // });
+    await jest.advanceTimersByTimeAsync(20);
 
-  // test("should resume auto-scrolling when user scrolls back to bottom", async () => {
-  //   parent.style.height = "100px";
-  //   parent.style.overflow = "auto";
+    parent.scrollTop = parent.scrollHeight - parent.clientHeight;
+    parent.dispatchEvent(new Event("scroll"));
 
-  //   typer = new TypeMorph({
-  //     parent,
-  //     showCursor: false,
-  //     speed: 1,
-  //     autoScroll: true,
-  //   });
+    await jest.runAllTimersAsync();
 
-  //   const longText = "A".repeat(200);
-  //   typer.type(longText);
+    expect(parent.scrollTop).toBeCloseTo(
+      parent.scrollHeight - parent.clientHeight,
+      0
+    );
+  });
 
-  //   await jest.advanceTimersByTimeAsync(50);
+  test("should auto-scroll during backspacing", async () => {
+    const scrollSpy = jest.spyOn(parent, "scrollTo");
 
-  //   // User scrolls up
-  //   parent.scrollTop = 0;
-  //   parent.dispatchEvent(new Event("scroll"));
+    typer = new TypeMorph({
+      parent,
+      showCursor: false,
+      speed: 1,
+      backspaceSpeed: 1,
+      autoScroll: true,
+      loopCount: 2,
+      loopType: "backspace",
+      loopEndDelay: 0,
+      loopStartDelay: 0,
+      scrollInterval: 50,
+    });
 
-  //   await jest.advanceTimersByTimeAsync(20);
+    const longText = "A".repeat(100);
+    typer.loop(longText);
 
-  //   // User scrolls back to bottom
-  //   parent.scrollTop = parent.scrollHeight - parent.clientHeight;
-  //   parent.dispatchEvent(new Event("scroll"));
+    await jest.advanceTimersByTimeAsync(250);
+    expect(scrollSpy.mock.calls.length).toBeGreaterThanOrEqual(3);
 
-  //   await jest.runAllTimersAsync();
+    await jest.runAllTimersAsync();
 
-  //   // Should be at bottom again
-  //   expect(parent.scrollTop + parent.clientHeight).toBeCloseTo(
-  //     parent.scrollHeight,
-  //     0
-  //   );
-  // });
+    expect(parent.scrollTop + parent.clientHeight).toBeCloseTo(
+      parent.scrollHeight,
+      0
+    );
 
-  // test("should auto-scroll during backspacing", async () => {
-  //   parent.style.height = "100px";
-  //   parent.style.overflow = "auto";
+    scrollSpy.mockRestore();
+  });
 
-  //   typer = new TypeMorph({
-  //     parent,
-  //     showCursor: false,
-  //     speed: 1,
-  //     backspaceSpeed: 1,
-  //     autoScroll: true,
-  //     loopCount: 2,
-  //     loopType: "backspace",
-  //   });
+  test("should not scroll if content doesn't overflow", async () => {
+    Object.defineProperties(parent, {
+      clientHeight: {
+        get: () => 500,
+        configurable: true,
+      },
+    });
 
-  //   const longText = "A".repeat(200);
-  //   typer.loop(longText);
+    const scrollSpy = jest.spyOn(parent, "scrollTo");
 
-  //   await jest.runAllTimersAsync();
+    typer = new TypeMorph({
+      parent,
+      showCursor: false,
+      speed: 1,
+      autoScroll: true,
+    });
 
-  //   // Should scroll during both typing and backspacing
-  //   expect(parent.scrollTop + parent.clientHeight).toBeCloseTo(
-  //     parent.scrollHeight,
-  //     0
-  //   );
-  // });
+    typer.type("Short text");
+    await jest.runAllTimersAsync();
 
-  // test("should not scroll if content doesn't overflow", async () => {
-  //   parent.style.height = "500px";
-  //   parent.style.overflow = "auto";
+    expect(scrollSpy).not.toHaveBeenCalled();
+    expect(parent.scrollTop).toBe(0);
 
-  //   const scrollSpy = jest.spyOn(parent, "scrollTo");
-
-  //   typer = new TypeMorph({
-  //     parent,
-  //     showCursor: false,
-  //     speed: 1,
-  //     autoScroll: true,
-  //   });
-
-  //   typer.type("Short text");
-  //   await jest.runAllTimersAsync();
-
-  //   // No scrolling needed - content fits
-  //   expect(scrollSpy).not.toHaveBeenCalled();
-  //   expect(parent.scrollTop).toBe(0);
-
-  //   scrollSpy.mockRestore();
-  // });
-
-  // test("should cleanup scroll listener on destroy", async () => {
-  //   parent.style.height = "100px";
-  //   parent.style.overflow = "auto";
-
-  //   typer = new TypeMorph({
-  //     parent,
-  //     showCursor: false,
-  //     speed: 1,
-  //     autoScroll: true,
-  //   });
-
-  //   const longText = "A".repeat(200);
-  //   typer.type(longText);
-  //   await jest.advanceTimersByTimeAsync(50);
-
-  //   expect(typer._scrollListener).not.toBeNull();
-
-  //   typer.destroy();
-
-  //   expect(typer._scrollListener).toBeNull();
-  // });
+    scrollSpy.mockRestore();
+  });
 });
