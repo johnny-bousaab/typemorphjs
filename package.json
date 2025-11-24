@@ -16,7 +16,11 @@
     "README.md",
     "LICENSE"
   ],
-  "import": "./dist/typemorph.esm.js",
+  "exports": {
+    "import": "./dist/typemorph.esm.js"
+  },
+  "module": "./dist/typemorph.esm.js",
+  "unpkg": "./dist/typemorph.umd.min.js",
   "scripts": {
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
     "test:memory": "node --expose-gc --experimental-vm-modules ./node_modules/jest/bin/jest.js",
@@ -27,6 +31,7 @@
     "prepublishOnly": "npm run build"
   },
   "type": "module",
+  "source": "src/typemorph.js",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
