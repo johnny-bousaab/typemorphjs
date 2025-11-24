@@ -1,8 +1,8 @@
 # TypeMorph
 
-<!-- [![Tests](https://github.com/johnny-bousaab/typemorph/actions/workflows/test.yml/badge.svg)](https://github.com/johnny-bousaab/typemorph/actions)
-[![Coverage](https://codecov.io/gh/johnny-bousaab/typemorph/branch/main/graph/badge.svg)](https://codecov.io/gh/johnny-bousaab/typemorph)
-[![npm version](https://badge.fury.io/js/typemorph.svg)](https://www.npmjs.com/package/typemorph) -->
+<!-- [![Tests](https://github.com/johnny-bousaab/typemorphjs/actions/workflows/ci.yml/badge.svg)](https://github.com/johnny-bousaab/typemorphjs/actions) -->
+<!-- [![Coverage](https://codecov.io/gh/johnny-bousaab/typemorphjs/branch/main/graph/badge.svg)](https://codecov.io/gh/johnny-bousaab/typemorphjs) -->
+<!-- [![npm version](https://badge.fury.io/js/typemorph.svg)](https://www.npmjs.com/package/typemorph) -->
 
 **TypeMorph** is a lightweight JavaScript library for creating smooth, realistic typing effects. Supports features such as looping, backspacing, HTML, markdown, autoscrolling, and animated cursor.
 Perfect for hero sections, documentation intros, LLM chat animation, or anywhere you want animated text.
@@ -214,11 +214,6 @@ const typer = new TypeMorph({
 await typer.type("Slow text");
 await typer.type("Fast text", { speed: 30 });
 ```
-
-## 💬 Contributing
-
-Contributions, issues, and feature requests are welcome!
-Feel free to open a PR or discussion, whether it’s bug fixes, new features, or just ideas.
 
 ## 🧰 Development
 
