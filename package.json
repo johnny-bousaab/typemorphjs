@@ -1,4 +1,21 @@
 {
+  "name": "typemorphjs",
+  "version": "0.1.0",
+  "description": "Typing animation library that supports Markdown, HTML, looping, backspacing, auto scrolling and more. Perfect for things like LLM outputs, documentations or any typing effect in a DOM environment. ",
+  "author": "Johnny Bou Saab",
+  "license": "MIT",
+  "homepage": "https://github.com/johnny-bousaab/typemorphjs.git",
+  "repository": "https://github.com/johnny-bousaab/typemorphjs.git",
+  "keywords": [
+    "typing",
+    "animation",
+    "typing-effect"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
     "test:memory": "node --expose-gc --experimental-vm-modules ./node_modules/jest/bin/jest.js",
@@ -16,6 +33,7 @@
     "jest": "^30.2.0",
     "jest-environment-jsdom": "^30.2.0",
     "jsdom": "^27.1.0",
+    "np": "^10.2.0",
     "rollup": "^4.53.2",
     "rollup-plugin-gzip": "^4.1.1"
   },
