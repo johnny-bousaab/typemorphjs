@@ -826,4 +826,3 @@ async function getDeps() {
 }
 
 export { TypeMorph as default };
-//# sourceMappingURL=typemorph.esm.js.map

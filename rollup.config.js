@@ -11,19 +11,9 @@ export default [
     output: {
       file: "./dist/typemorph.esm.js",
       format: "esm",
-      sourcemap: true,
+      sourcemap: false,
     },
     external,
-  },
-  {
-    input: "./src/typemorph.js",
-    output: {
-      file: "./dist/typemorph.esm.min.js",
-      format: "esm",
-      sourcemap: true,
-    },
-    external,
-    plugins: [terser(), gzip()],
   },
   {
     input: "./src/typemorph.js",
@@ -39,7 +29,7 @@ export default [
         return "typemorph";
       },
     },
-    plugins: [resolve(), commonjs(), terser(), , gzip()],
+    plugins: [resolve(), commonjs(), terser()],
   },
   {
     input: "./src/typemorph.js",
@@ -49,7 +39,7 @@ export default [
       name: "TypeMorph",
       sourcemap: true,
     },
-    plugins: [terser(), , gzip()],
+    plugins: [terser()],
     external,
   },
 ];
