@@ -17,6 +17,7 @@ export const defaultConfigs = {
   markdownParse: null, // custom markdown parse function -> markdownParse(text, inline = false)
   hideCursorOnFinishTyping: true,
   autoScroll: true,
+  scrollContainer: null, // custom scroll container. If not provided, the current typing parent is the target for autoscroll
   scrollInterval: 1, // chunks typed before scroll is triggered when typing
   clearBeforeTyping: true, // if type() was used on same parent, whether to clear text content before typing again
   htmlSanitize: null, // custom html sanitize function -> htmlSanitize(html)

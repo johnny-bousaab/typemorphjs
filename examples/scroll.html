@@ -49,6 +49,7 @@
   speed: 20,
   autoScroll: true,
   scrollInterval: 5,
+  scrollContainer: 'target',
 });
 
 const longText = "This is a very long text string that is intended to overflow the vertical container boundaries. As the typing progresses, TypeMorph will automatically scroll the container to ensure the cursor and the newest text remain visible at all times. This is particularly useful for chat interfaces, logs, or terminal simulations.";
@@ -67,6 +68,7 @@ typer.type(longText);
         speed: 20,
         autoScroll: true,
         scrollInterval: 5,
+        scrollContainer: "target",
       });
 
       const longText =

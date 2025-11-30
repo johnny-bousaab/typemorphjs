@@ -17,6 +17,7 @@ const defaultConfigs = {
   markdownParse: null, // custom markdown parse function -> markdownParse(text, inline = false)
   hideCursorOnFinishTyping: true,
   autoScroll: true,
+  scrollContainer: null, // custom scroll container. If not provided, the current typing parent is the target for autoscroll
   scrollInterval: 1, // chunks typed before scroll is triggered when typing
   clearBeforeTyping: true, // if type() was used on same parent, whether to clear text content before typing again
   htmlSanitize: null, // custom html sanitize function -> htmlSanitize(html)
@@ -74,6 +75,8 @@ class TypeMorph {
 
     if (this.config.parent) this._setParent(this.config.parent);
     if (this.config.text) this._setText(this.config.text);
+    if (this.config.scrollContainer)
+      this._setScrollContainer(this.config.scrollContainer);
 
     this.speed = this.config.speed;
     this.backspaceSpeed = this.config.backspaceSpeed;
@@ -198,11 +201,13 @@ class TypeMorph {
     const loopFinalBehavior =
       options?.loopFinalBehavior ?? this.config.loopFinalBehavior;
 
+    options.scrollContainer = this._getScrollContainer(targetParent, options);
+
     if (clearBeforeTyping) {
       this._clearContent(targetParent);
     }
 
-    this._setupScrollTracking(targetParent);
+    this._setupScrollTracking(options.scrollContainer);
 
     try {
       do {
@@ -270,10 +275,16 @@ class TypeMorph {
   }
 
   async _type(text, parent, options, signal) {
-    const targetParent = this._resolveParent(parent);
-    const targetText = this._resolveText(text);
+    const targetParent = options.loopSource
+      ? parent
+      : this._resolveParent(parent);
+    const targetText = options.loopSource ? text : this._resolveText(text);
 
-    if (!options.loopSource) this._setupScrollTracking(targetParent);
+    options.scrollContainer = options.loopSource
+      ? options.scrollContainer
+      : this._getScrollContainer(targetParent, options);
+
+    if (!options.loopSource) this._setupScrollTracking(options.scrollContainer);
 
     this._isTyping = true;
 
@@ -409,7 +420,7 @@ class TypeMorph {
         buffer = "";
         scrollCounter++;
         if (autoScroll && scrollCounter >= scrollInterval) {
-          this._scrollToEnd(parent);
+          this._scrollToEnd(options.scrollContainer);
           scrollCounter = 0;
         }
       }
@@ -419,7 +430,7 @@ class TypeMorph {
     }
 
     if (autoScroll) {
-      this._scrollToEnd(parent);
+      this._scrollToEnd(options.scrollContainer);
     }
   }
 
@@ -562,7 +573,7 @@ class TypeMorph {
       scrollCounter++;
       if (autoScroll && scrollCounter >= scrollInterval) {
         if (node.parentNode) {
-          this._scrollToEnd(parent);
+          this._scrollToEnd(options.scrollContainer);
         }
         scrollCounter = 0;
       }
@@ -580,41 +591,51 @@ class TypeMorph {
     }
 
     if (autoScroll && this._parentStillExists(parent) && node.parentNode) {
-      this._scrollToEnd(parent);
+      this._scrollToEnd(options.scrollContainer);
     }
   }
 
   _resolveParent(parent = null) {
-    return this._validateParent(parent ?? this.parent);
+    return this._validateElement(parent ?? this.parent);
+  }
+
+  _getScrollContainer(currentParent, options) {
+    if (options?.scrollContainer)
+      this._validateElement(options.scrollContainer);
+    return this.scrollContainer ?? currentParent;
   }
 
   _setParent(parent) {
-    this.parent = this._validateParent(parent);
+    this.parent = this._validateElement(parent);
   }
 
-  _validateParent(parent) {
-    const parentEl = this._getParent(parent);
-    const isHtmlElement = parentEl instanceof Element;
+  _setScrollContainer(element) {
+    this.scrollContainer = this._validateElement(element);
+  }
 
-    if (!parentEl || !isHtmlElement) {
-      if (typeof parent === "string") {
+  _validateElement(element) {
+    const htmlEl = this._getElement(element);
+    const isHtmlElement = htmlEl instanceof Element;
+
+    if (!htmlEl || !isHtmlElement) {
+      if (typeof element === "string") {
         throw new Error(
-          `TypeMorph: Parent element not found for selector #${parent}`
+          `TypeMorph: Element not found for selector #${element}`
         );
       } else {
         throw new Error(
-          `TypeMorph: Parent element is not a valid HTML element or element ID`
+          `TypeMorph: Element is not a valid HTML element or element ID`
         );
       }
     }
 
-    return parentEl;
+    return htmlEl;
   }
 
-  _getParent(parent) {
-    return typeof parent === "string"
-      ? document.getElementById(parent)
-      : parent;
+  _getElement(element) {
+    return typeof element === "string"
+      ? document.getElementById(element)
+      : element;
   }
 
   _resolveText(text = null) {
