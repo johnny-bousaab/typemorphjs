@@ -19,6 +19,7 @@ export const defaultConfigs = {
   autoScroll: true,
   scrollContainer: null, // custom scroll container. If not provided, the current typing parent is the target for autoscroll
   scrollInterval: 1, // chunks typed before scroll is triggered when typing
+  smoothScroll: false, // instant scroll for reliable autoscroll for all speeds
   clearBeforeTyping: true, // if type() was used on same parent, whether to clear text content before typing again
   htmlSanitize: null, // custom html sanitize function -> htmlSanitize(html)
   onStop: (instance) => {}, // typing has been stopped callback

@@ -721,10 +721,14 @@ export default class TypeMorph {
   _scrollToEnd(parent) {
     if (parent.scrollHeight <= parent.clientHeight) return;
     if (this._userScrolled) return;
-    parent.scrollTo({
-      top: parent.scrollHeight - parent.clientHeight,
-      behavior: "smooth",
-    });
+    if (this.config.smoothScroll) {
+      parent.scrollTo({
+        top: parent.scrollHeight - parent.clientHeight,
+        behavior: "smooth",
+      });
+    } else {
+      parent.scrollTop = parent.scrollHeight - parent.clientHeight;
+    }
   }
 
   _setupScrollTracking(parent) {
