@@ -69,6 +69,28 @@ describe("TypeMorph - Auto-Scroll", () => {
     expect(container.scrollTop).toBe(0);
   });
 
+  test("should autoscroll when autoScroll=true and smoothScroll=true", async () => {
+    const longText = "A".repeat(200);
+
+    typer = new TypeMorph({
+      parent,
+      autoScroll: true,
+      speed: 1,
+      showCursor: false,
+      smoothScroll: true,
+    });
+
+    typer.type(longText);
+    await jest.runAllTimersAsync();
+
+    expect(parent.scrollTop).toBeGreaterThan(0);
+    expect(parent.scrollTop).toBeCloseTo(
+      parent.scrollHeight - parent.clientHeight,
+      0
+    );
+    expect(container.scrollTop).toBe(0);
+  });
+
   test("should autoscroll scrollContainer when autoScroll=true with custom scrollContainer", async () => {
     typer = new TypeMorph({
       parent,
@@ -152,6 +174,7 @@ describe("TypeMorph - Auto-Scroll", () => {
       speed: 1,
       autoScroll: true,
       scrollInterval: 10,
+      smoothScroll: true, // im using this here only to spy on scrollTo, easier to test
     });
 
     const text = "A".repeat(50);
@@ -267,6 +290,7 @@ describe("TypeMorph - Auto-Scroll", () => {
       loopEndDelay: 0,
       loopStartDelay: 0,
       scrollInterval: 50,
+      smoothScroll: true, // im using this here only to spy on scrollTo, easier to test
     });
 
     const longText = "A".repeat(100);
@@ -300,6 +324,7 @@ describe("TypeMorph - Auto-Scroll", () => {
       showCursor: false,
       speed: 1,
       autoScroll: true,
+      smoothScroll: true, // im using this here only to spy on scrollTo, easier to test
     });
 
     typer.type("Short text");
