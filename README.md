@@ -15,7 +15,7 @@ Perfect for hero sections, documentation intros, LLM chat animation, or anywhere
 - **Markdown support**: render markdown with [Marked](https://github.com/markedjs/marked)
 - **HTML support**: HTML is sanitized with [DOMPurify](https://github.com/cure53/DOMPurify)
 - **Configurable cursor**: built in and customizable blink animation
-- **Async API**: control typing flow with `type()`, `loop()`, `stop()`, and `destroy()`
+- **Async API**: control typing flow with `type()`, `loop()`, `backspace()`, `stop()`, and `destroy()`
 - **Framework agnostic**: works in plain JS, React, Vue, or anywhere with a DOM
 
 ## 📦 Installation
@@ -78,6 +78,31 @@ const typer = new TypeMorph({
 });
 
 typer.loop("This text will loop and backspace 5 times!");
+```
+
+### Backspace
+
+```javascript
+const typer = new TypeMorph({
+  parent: document.getElementById("target"),
+  speed: 50,
+});
+
+typer.backspace();
+```
+
+When backspacing with `count` to simulate a human typo and type some characters again, set `clearBeforeTyping` to `false`, so the text will append to the existing text:
+
+```javascript
+const typer = new TypeMorph({
+  parent: document.getElementById("target"),
+  speed: 50,
+  clearBeforeTyping: false,
+});
+
+await typer.type("Hello wirld");
+await typer.backspace(5);
+await typer.type("world");
 ```
 
 ### HTML
@@ -166,6 +191,7 @@ If you want to customize the cursor style, you can use the below CSS class:
 | ------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------- |
 | **`type(text: string, parent?: HTMLElement, options = {})`**  | `Promise<void>` | Types the provided text into the target element once.                     |
 | **`loop(text?: string, parent?: HTMLElement, options = {})`** | `Promise<void>` | Starts looping typing animation using the configured `loopType`.          |
+| **`backspace(count?: number, parent?: HTMLElement, options = {})`** | `Promise<void>` | Backspaces the provided number of characters (or all if count is null) from the target element once. |
 | **`stop()`**                                                  | `Promise<void>` | Gracefully stops any ongoing typing or looping operation.                 |
 | **`destroy()`**                                               | `void`          | Stops all operations, removes timers, event listeners, and the cursor.    |
 | **`isTyping()`**                                              | `boolean`       | Returns whether the instance is currently typing, looping or backspacing. |
