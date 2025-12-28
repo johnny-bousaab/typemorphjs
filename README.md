@@ -7,7 +7,7 @@
 **TypeMorph** is a lightweight JavaScript library for creating smooth, realistic typing effects. Supports features such as looping, backspacing, HTML, markdown, autoscrolling, and animated cursor.
 Perfect for hero sections, documentation intros, LLM chat animation, or anywhere you want animated text.
 
-## 🚀 Features
+## Features
 
 - **Typing engine**: character typing with customizable speed and chunking
 - **Looping modes**: clear or backspace styles
@@ -18,7 +18,7 @@ Perfect for hero sections, documentation intros, LLM chat animation, or anywhere
 - **Async API**: control typing flow with `type()`, `loop()`, `backspace()`, `stop()`, and `destroy()`
 - **Framework agnostic**: works in plain JS, React, Vue, or anywhere with a DOM
 
-## 📦 Installation
+## Installation
 
 ### Using npm
 
@@ -50,7 +50,7 @@ The core version of the library has 0 dependencies and is smaller in size, if yo
 <script src="https://cdn.jsdelivr.net/npm/typemorphjs/dist/typemorph.core.umd.min.js"></script>
 ```
 
-## ⚡ Quick Start
+## Quick Start
 
 ### Type
 
@@ -152,7 +152,7 @@ If you want to customize the cursor style, you can use the below CSS class:
 }
 ```
 
-## ⚙️ Configuration Options
+## Configuration Options
 
 | Option                     | Type                     | Default       | Description                                                                                                                                              |
 | -------------------------- | ------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -185,7 +185,7 @@ If you want to customize the cursor style, you can use the below CSS class:
 
 ---
 
-## 🧩 API Methods
+## API Methods
 
 | Method                                                        | Returns         | Description                                                               |
 | ------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------- |
@@ -199,7 +199,7 @@ If you want to customize the cursor style, you can use the below CSS class:
 
 ---
 
-## 🔔 Event Callbacks
+## Event Callbacks
 
 Each event callback receives the **`TypeMorph` instance** as its first argument
 
@@ -211,7 +211,7 @@ Each event callback receives the **`TypeMorph` instance** as its first argument
 
 ---
 
-## 🧱 Example Configuration
+## Example Configuration
 
 ```js
 const typer = new TypeMorph({
@@ -243,7 +243,7 @@ await typer.type("Slow text");
 await typer.type("Fast text", { speed: 30 });
 ```
 
-## 🧰 Development
+## Development
 
 ### Install deps
 
@@ -269,6 +269,6 @@ npm run test:coverage
 npm run build
 ```
 
-## ⭐ Show some love
+## Show some love
 
 If you find TypeMorph useful, consider starring the repo, it helps others discover it!
