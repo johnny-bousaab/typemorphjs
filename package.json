@@ -5,7 +5,10 @@
   "author": "Johnny Bou Saab",
   "license": "MIT",
   "homepage": "https://johnny-bousaab.github.io/typemorphjs",
-  "repository": "https://github.com/johnny-bousaab/typemorphjs.git",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/johnny-bousaab/typemorphjs.git"
+  },
   "keywords": [
     "typing",
     "animation",
