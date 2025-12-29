@@ -157,11 +157,11 @@
           showCursor: false,
           parseHtml: true,
           speed: 50,
+          clearBeforeTyping: true,
         });
 
         liveDemoBtn.remove();
         const html = container.innerHTML.replace(/ {2,}/g, " ");
-        container.innerHTML = "";
 
         await homepageTyper.type(html, {
           speed: 15,

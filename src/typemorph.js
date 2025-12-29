@@ -191,8 +191,6 @@ export default class TypeMorph {
 
     try {
       do {
-        if (signal.aborted) break;
-
         const willStillBeLooping =
           this._currentlyLooping(targetParent) &&
           this._currentLoop < loopCount - 1;
@@ -460,7 +458,6 @@ export default class TypeMorph {
   }
 
   async _backspaceContent(parent, node, signal, options, state = {}) {
-    if (!state.charDeleteCount) state.charDeleteCount = 0;
     if (signal.aborted || !this._parentStillExists(parent)) return;
 
     const children = Array.from(node.childNodes);
@@ -474,38 +471,41 @@ export default class TypeMorph {
       }
 
       if (child.nodeType === Node.TEXT_NODE) {
-        const { charDeleteCount } = await this._backspaceTextNode(
+        const { currentRemainingCharCount } = await this._backspaceTextNode(
           child,
           parent,
           signal,
-          options
+          options,
+          state
         );
 
-        state.charDeleteCount += charDeleteCount;
+        state.currentRemainingCharCount = currentRemainingCharCount;
+
         if (
-          options.maxDeleteCount &&
+          options.maxDeleteCount != null &&
           state.charDeleteCount >= options.maxDeleteCount
         )
           break;
       } else if (child.nodeType === Node.ELEMENT_NODE) {
-        if (
-          options.maxDeleteCount &&
-          state.charDeleteCount >= options.maxDeleteCount
-        )
-          break;
-
         await this._backspaceContent(parent, child, signal, options, state);
 
+        const stopped =
+          options.maxDeleteCount != null &&
+          state.charDeleteCount >= options.maxDeleteCount;
+
         if (!signal.aborted) {
-          child.parentNode.removeChild(child);
+          if (!stopped || state.currentRemainingCharCount === 0) {
+            child.parentNode.removeChild(child);
+            state.currentRemainingCharCount = null;
+          }
           if (this._cursorEl) {
             this._appendCursorToLastTextNode(parent);
           }
         }
+
+        if (stopped) break;
       }
     }
-
-    this._cleanEmptyTextNodes(parent);
   }
 
   _appendCursorToLastTextNode(parent) {
@@ -538,22 +538,13 @@ export default class TypeMorph {
     return null;
   }
 
-  _cleanEmptyTextNodes(parent) {
-    const children = Array.from(parent.childNodes);
-    children.forEach((child) => {
-      if (
-        child.nodeType === Node.TEXT_NODE &&
-        (!child.textContent || child.textContent.trim().length === 0)
-      ) {
-        child.parentNode.removeChild(child);
-      }
-    });
-  }
-
-  async _backspaceTextNode(node, parent, signal, options) {
+  async _backspaceTextNode(node, parent, signal, options, state) {
     const chars = Array.from(node.textContent);
-    let charDeleteCount = 0;
+    if (state.charDeleteCount == null) state.charDeleteCount = 0;
+    let currentRemainingCharCount = chars.length;
     let scrollCounter = 0;
+
+    if (options.maxDeleteCount === 0) return { currentRemainingCharCount };
 
     const chunkSize = options?.chunkSize ?? this.config.chunkSize;
     const autoScroll = options?.autoScroll ?? this.config.autoScroll;
@@ -567,7 +558,11 @@ export default class TypeMorph {
       const backspaceSpeed = options?.backspaceSpeed ?? this.backspaceSpeed;
 
       node.textContent = charsToKeep.join("");
-      charDeleteCount += i - chunkStart + 1;
+      state.charDeleteCount += i - chunkStart + 1;
+      currentRemainingCharCount = Math.max(
+        0,
+        currentRemainingCharCount - chunkSize
+      );
 
       scrollCounter++;
       if (autoScroll && scrollCounter >= scrollInterval) {
@@ -580,7 +575,10 @@ export default class TypeMorph {
       if (this._parentStillExists(parent))
         await this._delay(backspaceSpeed, signal);
 
-      if (options.maxDeleteCount && charDeleteCount >= options.maxDeleteCount)
+      if (
+        options.maxDeleteCount != null &&
+        state.charDeleteCount >= options.maxDeleteCount
+      )
         break;
     }
 
@@ -596,7 +594,7 @@ export default class TypeMorph {
       this._scrollToEnd(options.scrollContainer);
     }
 
-    return { charDeleteCount };
+    return { currentRemainingCharCount };
   }
 
   _resolveParent(parent = null) {

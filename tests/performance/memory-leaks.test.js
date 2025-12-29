@@ -53,6 +53,17 @@ describe("TypeMorph - Memory Leaks & Performance", () => {
       typer.destroy();
     });
 
+    test("should cleanup all timers after backspace()", async () => {
+      typer.type("This is a long text that will be backspaced");
+
+      typer.backspace();
+      await jest.runAllTimersAsync();
+
+      assertNoMemoryLeaks(typer);
+
+      typer.destroy();
+    });
+
     test("should cleanup all timers after destroy()", async () => {
       typer.type("Test text");
 
@@ -332,6 +343,29 @@ describe("TypeMorph - Memory Leaks & Performance", () => {
       await jest.runAllTimersAsync();
 
       expect(parent.textContent).toBe("Text 99");
+      expect(typer.isTyping()).toBe(false);
+      assertNoMemoryLeaks(typer);
+
+      typer.destroy();
+    });
+
+    test("should handle 100 rapid backspace() calls", async () => {
+      const typer = new TypeMorph({
+        parent,
+        speed: 5,
+        showCursor: false,
+      });
+
+      typer.type("Text");
+      await jest.runAllTimersAsync();
+
+      for (let i = 0; i < 100; i++) {
+        typer.backspace();
+      }
+
+      await jest.runAllTimersAsync();
+
+      expect(parent.textContent).toBe("");
       expect(typer.isTyping()).toBe(false);
       assertNoMemoryLeaks(typer);
 
