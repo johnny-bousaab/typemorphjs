@@ -88,6 +88,43 @@ export default class TypeMorph {
   }
 
   /**
+   * Backspace animation
+   * @param {number} count - Number of characters to backspace
+   * @param {HTMLElement|string} parent - Parent element or selector
+   * @param {object} options - Additional options to override instance config for current operation
+   */
+  async backspace(count = null, parent = null, options = {}) {
+    this._checkLifetime();
+    const { _parent, _options } = this._readOptions(parent, options);
+    this._validateOptions(_options);
+    const targetParent = this._resolveParent(_parent);
+    _options.scrollContainer = this._getScrollContainer(targetParent, _options);
+    this._setupScrollTracking(_options.scrollContainer);
+
+    if (count != null && (typeof count != "number" || count < 0))
+      throw new Error("TypeMorph: count has to be a number >= 0");
+
+    await this._cancelCurrentOperation(_options);
+    return this._startOperation(async (signal) => {
+      this._createCursor(_options);
+
+      try {
+        this._isTyping = true;
+
+        await this._backspaceContent(targetParent, targetParent, signal, {
+          ..._options,
+          maxDeleteCount: count,
+        });
+      } finally {
+        this._isTyping = false;
+        if (!signal.aborted) {
+          await this._onFinish(_options);
+        }
+      }
+    });
+  }
+
+  /**
    * Destroy the instance and cleanup
    */
   destroy() {
@@ -154,8 +191,6 @@ export default class TypeMorph {
 
     try {
       do {
-        if (signal.aborted) break;
-
         const willStillBeLooping =
           this._currentlyLooping(targetParent) &&
           this._currentLoop < loopCount - 1;
@@ -193,12 +228,10 @@ export default class TypeMorph {
           if (loopType === "clear") {
             this._clearContent(targetParent);
           } else {
-            await this._backspaceContent(
-              targetParent,
-              targetParent,
-              signal,
-              options
-            );
+            await this._backspaceContent(targetParent, targetParent, signal, {
+              ...options,
+              maxDeleteCount: null,
+            });
           }
         }
 
@@ -210,7 +243,7 @@ export default class TypeMorph {
       );
 
       if (!signal.aborted) {
-        await this._onFinish();
+        await this._onFinish(options);
       }
     } finally {
       this._isTyping = false;
@@ -424,7 +457,7 @@ export default class TypeMorph {
     }
   }
 
-  async _backspaceContent(parent, node, signal, options) {
+  async _backspaceContent(parent, node, signal, options, state = {}) {
     if (signal.aborted || !this._parentStillExists(parent)) return;
 
     const children = Array.from(node.childNodes);
@@ -438,20 +471,41 @@ export default class TypeMorph {
       }
 
       if (child.nodeType === Node.TEXT_NODE) {
-        await this._backspaceTextNode(child, parent, signal, options);
+        const { currentRemainingCharCount } = await this._backspaceTextNode(
+          child,
+          parent,
+          signal,
+          options,
+          state
+        );
+
+        state.currentRemainingCharCount = currentRemainingCharCount;
+
+        if (
+          options.maxDeleteCount != null &&
+          state.charDeleteCount >= options.maxDeleteCount
+        )
+          break;
       } else if (child.nodeType === Node.ELEMENT_NODE) {
-        await this._backspaceContent(parent, child, signal, options);
+        await this._backspaceContent(parent, child, signal, options, state);
+
+        const stopped =
+          options.maxDeleteCount != null &&
+          state.charDeleteCount >= options.maxDeleteCount;
 
         if (!signal.aborted) {
-          child.parentNode.removeChild(child);
+          if (!stopped || state.currentRemainingCharCount === 0) {
+            child.parentNode.removeChild(child);
+            state.currentRemainingCharCount = null;
+          }
           if (this._cursorEl) {
             this._appendCursorToLastTextNode(parent);
           }
         }
+
+        if (stopped) break;
       }
     }
-
-    this._cleanEmptyTextNodes(parent);
   }
 
   _appendCursorToLastTextNode(parent) {
@@ -484,22 +538,13 @@ export default class TypeMorph {
     return null;
   }
 
-  _cleanEmptyTextNodes(parent) {
-    const children = Array.from(parent.childNodes);
-    children.forEach((child) => {
-      if (
-        child.nodeType === Node.TEXT_NODE &&
-        (!child.textContent || child.textContent.trim().length === 0)
-      ) {
-        child.parentNode.removeChild(child);
-      }
-    });
-  }
-
-  async _backspaceTextNode(node, parent, signal, options) {
+  async _backspaceTextNode(node, parent, signal, options, state) {
     const chars = Array.from(node.textContent);
-    let deleteCount = 0;
+    if (state.charDeleteCount == null) state.charDeleteCount = 0;
+    let currentRemainingCharCount = chars.length;
     let scrollCounter = 0;
+
+    if (options.maxDeleteCount === 0) return { currentRemainingCharCount };
 
     const chunkSize = options?.chunkSize ?? this.config.chunkSize;
     const autoScroll = options?.autoScroll ?? this.config.autoScroll;
@@ -513,7 +558,11 @@ export default class TypeMorph {
       const backspaceSpeed = options?.backspaceSpeed ?? this.backspaceSpeed;
 
       node.textContent = charsToKeep.join("");
-      deleteCount += i - chunkStart + 1;
+      state.charDeleteCount += i - chunkStart + 1;
+      currentRemainingCharCount = Math.max(
+        0,
+        currentRemainingCharCount - chunkSize
+      );
 
       scrollCounter++;
       if (autoScroll && scrollCounter >= scrollInterval) {
@@ -525,6 +574,12 @@ export default class TypeMorph {
 
       if (this._parentStillExists(parent))
         await this._delay(backspaceSpeed, signal);
+
+      if (
+        options.maxDeleteCount != null &&
+        state.charDeleteCount >= options.maxDeleteCount
+      )
+        break;
     }
 
     if (
@@ -538,6 +593,8 @@ export default class TypeMorph {
     if (autoScroll && this._parentStillExists(parent) && node.parentNode) {
       this._scrollToEnd(options.scrollContainer);
     }
+
+    return { currentRemainingCharCount };
   }
 
   _resolveParent(parent = null) {

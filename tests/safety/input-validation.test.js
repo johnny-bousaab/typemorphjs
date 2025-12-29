@@ -115,6 +115,18 @@ describe("TypeMorph - Input Validation", () => {
       }).toThrow(/loopCount/);
     });
 
+    test("should throw when backspace count is not a number", async () => {
+      const typer = new TypeMorph({ parent });
+      await expect(typer.backspace("many")).rejects.toThrow(/count/);
+    });
+
+    test("should accept backspace count of 0", () => {
+      expect(() => {
+        const typer = new TypeMorph({ parent });
+        typer.backspace(0);
+      }).not.toThrow();
+    });
+
     test("should accept loopCount of 0", () => {
       expect(() => {
         const typer = new TypeMorph({ parent, loopCount: 0 });

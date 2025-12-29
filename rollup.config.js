@@ -1,7 +1,6 @@
 import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import terser from "@rollup/plugin-terser";
-import gzip from "rollup-plugin-gzip";
 
 const external = ["marked", "dompurify"];
 
