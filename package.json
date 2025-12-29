@@ -1,6 +1,6 @@
 {
   "name": "typemorphjs",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "Typing animation library that supports Markdown, HTML, looping, backspacing, auto scrolling and more. Perfect for things like LLM outputs, documentations or any typing effect in a DOM environment. ",
   "author": "Johnny Bou Saab",
   "license": "MIT",
